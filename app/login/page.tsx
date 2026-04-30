@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-zinc-100">
@@ -30,12 +32,12 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <a
+        <Link
           href="/"
           className="mt-6 inline-block text-sm text-zinc-400 transition hover:text-amber-400"
         >
           Volver al inicio
-        </a>
+        </Link>
       </section>
     </main>
   );
