@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -16,19 +18,19 @@ export default function Home() {
         </p>
 
         <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-          <a
+          <Link
             href="/login"
             className="rounded-full bg-amber-500 px-8 py-3 text-sm font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400"
           >
             Iniciar sesión
-          </a>
+          </Link>
 
-          <a
+          <Link
             href="/register"
             className="rounded-full border border-zinc-700 px-8 py-3 text-sm font-bold uppercase tracking-wide text-zinc-100 transition hover:border-amber-500 hover:text-amber-400"
           >
             Registrarse
-          </a>
+          </Link>
         </div>
       </section>
     </main>
