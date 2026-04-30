@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const products = [
   {
     id: 1,
@@ -48,12 +50,12 @@ export default function CatalogPage() {
             </p>
           </div>
 
-          <a
+          <Link
             href="/"
             className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
           >
             Salir
-          </a>
+          </Link>
         </header>
 
         <section className="mt-8 grid gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 md:grid-cols-3">
