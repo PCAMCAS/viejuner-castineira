@@ -1,34 +1,5 @@
 import Link from "next/link";
-
-const products = [
-  {
-    id: 1,
-    name: "Bibliotecario Blood Angels de metal",
-    system: "Warhammer 40K",
-    faction: "Blood Angels",
-    condition: "Metal · Pintado",
-    price: 18,
-    status: "Disponible",
-  },
-  {
-    id: 2,
-    name: "Pack Eldars clásicos",
-    system: "Warhammer 40K",
-    faction: "Eldars",
-    condition: "Plástico · Montado",
-    price: 42,
-    status: "Reservado",
-  },
-  {
-    id: 3,
-    name: "Orkos antiguos lote x10",
-    system: "Warhammer 40K",
-    faction: "Orkos",
-    condition: "Plástico · Sin pintar",
-    price: 35,
-    status: "Disponible",
-  },
-];
+import { factions, gameSystems, products } from "../_data/catalog";
 
 export default function CatalogPage() {
   return (
@@ -63,12 +34,13 @@ export default function CatalogPage() {
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
               Sistema
             </span>
+
             <select className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none focus:border-amber-500">
-              <option>Todos</option>
-              <option>Warhammer 40K</option>
-              <option>Age of Sigmar</option>
-              <option>Warhammer Fantasy</option>
-              <option>Otros</option>
+              {gameSystems.map((system) => (
+                <option key={system.id} value={system.slug}>
+                  {system.name}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -76,11 +48,13 @@ export default function CatalogPage() {
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
               Facción
             </span>
+
             <select className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none focus:border-amber-500">
-              <option>Todas</option>
-              <option>Blood Angels</option>
-              <option>Eldars</option>
-              <option>Orkos</option>
+              {factions.map((faction) => (
+                <option key={faction.id} value={faction.slug}>
+                  {faction.name}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -88,9 +62,10 @@ export default function CatalogPage() {
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
               Ordenar
             </span>
+
             <select className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none focus:border-amber-500">
-              <option>Precio ascendente</option>
-              <option>Precio descendente</option>
+              <option value="price-asc">Precio ascendente</option>
+              <option value="price-desc">Precio descendente</option>
             </select>
           </label>
         </section>
@@ -116,6 +91,7 @@ export default function CatalogPage() {
                       <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
                         {product.system}
                       </p>
+
                       <h2 className="mt-2 text-xl font-black">
                         {product.name}
                       </h2>
