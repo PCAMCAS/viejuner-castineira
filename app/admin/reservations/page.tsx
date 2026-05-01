@@ -129,6 +129,17 @@ export default function AdminReservationsPage() {
     setIsLoading(true);
     setErrorMessage("");
 
+    const { error: expireError } = await supabase.rpc(
+      "expire_old_reservations",
+    );
+
+    if (expireError) {
+      setErrorMessage(expireError.message);
+      setReservations([]);
+      setIsLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("reservations")
       .select(
@@ -272,7 +283,8 @@ export default function AdminReservationsPage() {
               </p>
 
               <p className="mt-3 text-sm text-zinc-400">
-                Leyendo reservas reales desde Supabase.
+                Limpiando reservas caducadas y leyendo reservas reales desde
+                Supabase.
               </p>
             </section>
           ) : null}
