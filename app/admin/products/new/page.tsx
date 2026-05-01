@@ -1,8 +1,103 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
 import { AdminGuard } from "../../../_components/admin-guard";
 import { factions, gameSystems } from "../../../_data/catalog";
+import { supabase } from "../../../../lib/supabase/client";
+
+const PRODUCT_IMAGES_BUCKET = "product-images";
 
 export default function NewProductPage() {
+  const router = useRouter();
+
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setErrorMessage("");
+    setIsLoading(true);
+
+    const formData = new FormData(event.currentTarget);
+
+    const name = String(formData.get("name") ?? "").trim();
+    const description = String(formData.get("description") ?? "").trim();
+    const price = Number(formData.get("price"));
+    const condition = String(formData.get("condition") ?? "").trim();
+    const gameSystem = String(formData.get("system") ?? "").trim();
+    const faction = String(formData.get("faction") ?? "").trim();
+    const isVisible = formData.get("isVisible") === "on";
+    const image = formData.get("image");
+
+    if (!name || !description || !condition || !gameSystem || !faction) {
+      setErrorMessage("Rellena todos los campos obligatorios.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!price || price <= 0) {
+      setErrorMessage("El precio debe ser mayor que 0.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!(image instanceof File) || image.size === 0) {
+      setErrorMessage("Sube una imagen del producto.");
+      setIsLoading(false);
+      return;
+    }
+
+    const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedImageTypes.includes(image.type)) {
+      setErrorMessage("La imagen debe ser JPG, PNG o WEBP.");
+      setIsLoading(false);
+      return;
+    }
+
+    const fileExtension = image.name.split(".").pop();
+    const fileName = `${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
+    const filePath = `products/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(PRODUCT_IMAGES_BUCKET)
+      .upload(filePath, image);
+
+    if (uploadError) {
+      setErrorMessage(uploadError.message);
+      setIsLoading(false);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(PRODUCT_IMAGES_BUCKET)
+      .getPublicUrl(filePath);
+
+    const { error: insertError } = await supabase.from("products").insert({
+      name,
+      description,
+      price,
+      image_url: publicUrlData.publicUrl,
+      game_system: gameSystem,
+      faction,
+      condition,
+      status: "available",
+      is_visible: isVisible,
+    });
+
+    if (insertError) {
+      setErrorMessage(insertError.message);
+      setIsLoading(false);
+      return;
+    }
+
+    router.push("/admin/products");
+    router.refresh();
+  }
+
   return (
     <AdminGuard>
       <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
@@ -18,9 +113,8 @@ export default function NewProductPage() {
               </h1>
 
               <p className="mt-4 max-w-2xl text-zinc-400">
-                Añade una miniatura individual o un lote al catálogo privado. Más
-                adelante este formulario guardará el producto en Supabase y
-                subirá la imagen a Storage.
+                Añade una miniatura individual o un lote al catálogo privado. El
+                producto se guardará en Supabase junto con su imagen.
               </p>
             </div>
 
@@ -34,7 +128,10 @@ export default function NewProductPage() {
             </nav>
           </header>
 
-          <form className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
+          <form
+            onSubmit={handleCreateProduct}
+            className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]"
+          >
             <section className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl">
               <div>
                 <label
@@ -107,14 +204,16 @@ export default function NewProductPage() {
                     <option value="" disabled>
                       Selecciona estado
                     </option>
-                    <option value="new-on-sprue">Nuevo en matriz</option>
-                    <option value="unassembled">Sin montar</option>
-                    <option value="assembled">Montado</option>
-                    <option value="primed">Imprimado</option>
-                    <option value="painted">Pintado</option>
-                    <option value="metal">Metal</option>
-                    <option value="resin">Resina</option>
-                    <option value="mixed">Mixto / lote variado</option>
+                    <option value="Nuevo en matriz">Nuevo en matriz</option>
+                    <option value="Sin montar">Sin montar</option>
+                    <option value="Montado">Montado</option>
+                    <option value="Imprimado">Imprimado</option>
+                    <option value="Pintado">Pintado</option>
+                    <option value="Metal">Metal</option>
+                    <option value="Resina">Resina</option>
+                    <option value="Mixto / lote variado">
+                      Mixto / lote variado
+                    </option>
                   </select>
                 </div>
               </div>
@@ -167,7 +266,7 @@ export default function NewProductPage() {
                     {factions
                       .filter((faction) => faction.id !== "all")
                       .map((faction) => (
-                        <option key={faction.id} value={faction.slug}>
+                        <option key={faction.id} value={faction.name}>
                           {faction.name}
                         </option>
                       ))}
@@ -190,8 +289,7 @@ export default function NewProductPage() {
                     Subir foto
                   </span>
                   <span className="mt-2 max-w-48 text-xs leading-5 text-zinc-500">
-                    JPG, PNG o WEBP. Más adelante se guardará en Supabase
-                    Storage.
+                    JPG, PNG o WEBP. La imagen se guardará en Supabase Storage.
                   </span>
                 </label>
 
@@ -208,6 +306,12 @@ export default function NewProductPage() {
                 El producto aparecerá en el catálogo como disponible cuando se
                 guarde.
               </div>
+
+              {errorMessage ? (
+                <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                  {errorMessage}
+                </p>
+              ) : null}
 
               <label className="flex items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
                 <span>
@@ -228,10 +332,11 @@ export default function NewProductPage() {
               </label>
 
               <button
-                type="button"
-                className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400"
+                type="submit"
+                disabled={isLoading}
+                className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
               >
-                Crear producto
+                {isLoading ? "Creando producto..." : "Crear producto"}
               </button>
 
               <Link

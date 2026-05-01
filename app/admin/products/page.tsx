@@ -75,9 +75,7 @@ export default function AdminProductsPage() {
       "¿Seguro que quieres ocultar este producto del catálogo?",
     );
 
-    if (!confirmHide) {
-      return;
-    }
+    if (!confirmHide) return;
 
     setUpdatingProductId(productId);
     setErrorMessage("");
@@ -101,14 +99,41 @@ export default function AdminProductsPage() {
     setUpdatingProductId(null);
   }
 
+  async function showProduct(productId: number) {
+    const confirmShow = window.confirm(
+      "¿Seguro que quieres volver a mostrar este producto en el catálogo?",
+    );
+
+    if (!confirmShow) return;
+
+    setUpdatingProductId(productId);
+    setErrorMessage("");
+
+    const { error } = await supabase
+      .from("products")
+      .update({
+        is_visible: true,
+        status: "available",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setUpdatingProductId(null);
+      return;
+    }
+
+    await loadProducts();
+    setUpdatingProductId(null);
+  }
+
   async function markProductAsSold(productId: number) {
     const confirmSold = window.confirm(
       "¿Seguro que quieres marcar este producto como vendido? Desaparecerá del catálogo.",
     );
 
-    if (!confirmSold) {
-      return;
-    }
+    if (!confirmSold) return;
 
     setUpdatingProductId(productId);
     setErrorMessage("");
@@ -118,6 +143,35 @@ export default function AdminProductsPage() {
       .update({
         status: "sold",
         is_visible: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setUpdatingProductId(null);
+      return;
+    }
+
+    await loadProducts();
+    setUpdatingProductId(null);
+  }
+
+  async function reactivateProduct(productId: number) {
+    const confirmReactivate = window.confirm(
+      "¿Seguro que quieres reactivar este producto? Volverá a aparecer como disponible en el catálogo.",
+    );
+
+    if (!confirmReactivate) return;
+
+    setUpdatingProductId(productId);
+    setErrorMessage("");
+
+    const { error } = await supabase
+      .from("products")
+      .update({
+        status: "available",
+        is_visible: true,
         updated_at: new Date().toISOString(),
       })
       .eq("id", productId);
@@ -193,28 +247,9 @@ export default function AdminProductsPage() {
             </section>
           ) : null}
 
-          {!isLoading && !errorMessage && products.length === 0 ? (
-            <section className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-10 text-center">
-              <p className="text-lg font-bold text-zinc-100">
-                Todavía no hay productos.
-              </p>
-
-              <p className="mt-3 text-sm text-zinc-400">
-                Crea el primer producto desde el panel de administración.
-              </p>
-
-              <Link
-                href="/admin/products/new"
-                className="mt-6 inline-block rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400"
-              >
-                Crear producto
-              </Link>
-            </section>
-          ) : null}
-
           {!isLoading && products.length > 0 ? (
             <section className="mt-8 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 shadow-2xl">
-              <div className="grid grid-cols-1 gap-4 border-b border-zinc-800 p-5 text-sm font-bold uppercase tracking-[0.2em] text-zinc-500 md:grid-cols-[1fr_150px_150px_120px_230px]">
+              <div className="grid grid-cols-1 gap-4 border-b border-zinc-800 p-5 text-sm font-bold uppercase tracking-[0.2em] text-zinc-500 md:grid-cols-[1fr_150px_150px_120px_270px]">
                 <span>Producto</span>
                 <span>Sistema</span>
                 <span>Facción</span>
@@ -233,7 +268,7 @@ export default function AdminProductsPage() {
                   return (
                     <article
                       key={product.id}
-                      className="grid grid-cols-1 gap-4 p-5 md:grid-cols-[1fr_150px_150px_120px_230px] md:items-center"
+                      className="grid grid-cols-1 gap-4 p-5 md:grid-cols-[1fr_150px_150px_120px_270px] md:items-center"
                     >
                       <div className="flex gap-4">
                         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
@@ -266,7 +301,9 @@ export default function AdminProductsPage() {
                                   ? "bg-zinc-800 text-zinc-400"
                                   : isSold
                                     ? "bg-red-500/10 text-red-300"
-                                    : "bg-emerald-500/10 text-emerald-400"
+                                    : isHidden
+                                      ? "bg-zinc-800 text-zinc-400"
+                                      : "bg-emerald-500/10 text-emerald-400"
                               }`}
                             >
                               {getStatusLabel(product.status)}
@@ -299,14 +336,34 @@ export default function AdminProductsPage() {
                           Editar
                         </Link>
 
-                        <button
-                          type="button"
-                          disabled={isUpdating || isHidden || isSold}
-                          onClick={() => hideProduct(product.id)}
-                          className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
-                        >
-                          {isUpdating ? "..." : "Ocultar"}
-                        </button>
+                        {isSold ? (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => reactivateProduct(product.id)}
+                            className="rounded-xl border border-emerald-500/40 px-3 py-2 text-xs font-bold uppercase tracking-wide text-emerald-300 transition hover:border-emerald-400 hover:text-emerald-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
+                          >
+                            {isUpdating ? "..." : "Reactivar"}
+                          </button>
+                        ) : isHidden ? (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => showProduct(product.id)}
+                            className="rounded-xl border border-emerald-500/40 px-3 py-2 text-xs font-bold uppercase tracking-wide text-emerald-300 transition hover:border-emerald-400 hover:text-emerald-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
+                          >
+                            {isUpdating ? "..." : "Mostrar"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => hideProduct(product.id)}
+                            className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
+                          >
+                            {isUpdating ? "..." : "Ocultar"}
+                          </button>
+                        )}
 
                         <button
                           type="button"
@@ -321,6 +378,25 @@ export default function AdminProductsPage() {
                   );
                 })}
               </div>
+            </section>
+          ) : null}
+
+          {!isLoading && !errorMessage && products.length === 0 ? (
+            <section className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-10 text-center">
+              <p className="text-lg font-bold text-zinc-100">
+                Todavía no hay productos.
+              </p>
+
+              <p className="mt-3 text-sm text-zinc-400">
+                Crea el primer producto desde el panel de administración.
+              </p>
+
+              <Link
+                href="/admin/products/new"
+                className="mt-6 inline-block rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400"
+              >
+                Crear producto
+              </Link>
             </section>
           ) : null}
         </section>
