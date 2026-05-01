@@ -69,6 +69,17 @@ export default function CatalogContent() {
       setIsLoading(true);
       setErrorMessage("");
 
+      const { error: expireError } = await supabase.rpc(
+        "expire_old_reservations",
+      );
+
+      if (expireError) {
+        setErrorMessage(expireError.message);
+        setProducts([]);
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("products")
         .select(
@@ -124,6 +135,13 @@ export default function CatalogContent() {
             description="Filtra por sistema, facción y precio. Los productos reservados se muestran en el catálogo, pero no se pueden volver a reservar."
             actions={
               <nav className="flex flex-wrap items-center gap-4">
+                <Link
+                  href="/profile"
+                  className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400"
+                >
+                  Mi perfil
+                </Link>
+
                 <Link
                   href="/reservations"
                   className="rounded-full border border-amber-500/50 px-5 py-2 text-sm font-bold uppercase tracking-wide text-amber-400 transition hover:border-amber-400 hover:text-amber-300"
