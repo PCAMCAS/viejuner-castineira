@@ -23,7 +23,12 @@ type ReservationItem = {
 
 type Reservation = {
   id: number;
-  status: "active" | "expired" | "cancelled_by_user" | "cancelled_by_admin" | "sold";
+  status:
+    | "active"
+    | "expired"
+    | "cancelled_by_user"
+    | "cancelled_by_admin"
+    | "sold";
   expires_at: string;
   reservation_items: ReservationItem[];
 };
@@ -68,6 +73,8 @@ export default function ReservationsPage() {
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
+  const [isCancellingReservation, setIsCancellingReservation] = useState(false);
 
   async function loadReservation() {
     setIsLoading(true);
@@ -123,6 +130,62 @@ export default function ReservationsPage() {
     setIsLoading(false);
   }
 
+  async function removeReservationItem(itemId: number) {
+    const confirmRemove = window.confirm(
+      "¿Seguro que quieres quitar este producto de tu reserva?",
+    );
+
+    if (!confirmRemove) {
+      return;
+    }
+
+    setUpdatingItemId(itemId);
+    setErrorMessage("");
+
+    const { error } = await supabase.rpc("remove_reservation_item", {
+      item_id_input: itemId,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setUpdatingItemId(null);
+      return;
+    }
+
+    await loadReservation();
+    setUpdatingItemId(null);
+  }
+
+  async function cancelReservation() {
+    if (!reservation) {
+      return;
+    }
+
+    const confirmCancel = window.confirm(
+      "¿Seguro que quieres cancelar la reserva completa? Todos los productos volverán al catálogo.",
+    );
+
+    if (!confirmCancel) {
+      return;
+    }
+
+    setIsCancellingReservation(true);
+    setErrorMessage("");
+
+    const { error } = await supabase.rpc("cancel_active_reservation", {
+      reservation_id_input: reservation.id,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setIsCancellingReservation(false);
+      return;
+    }
+
+    await loadReservation();
+    setIsCancellingReservation(false);
+  }
+
   useEffect(() => {
     loadReservation();
   }, []);
@@ -165,7 +228,7 @@ export default function ReservationsPage() {
 
           {errorMessage ? (
             <section className="mt-8 rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-red-200">
-              <p className="font-bold">No se han podido cargar tus reservas.</p>
+              <p className="font-bold">No se ha podido completar la acción.</p>
               <p className="mt-2 text-sm">{errorMessage}</p>
             </section>
           ) : null}
@@ -194,6 +257,7 @@ export default function ReservationsPage() {
               <div className="space-y-4">
                 {reservationItems.map((item) => {
                   const product = item.products;
+                  const isUpdating = updatingItemId === item.id;
 
                   if (!product) {
                     return null;
@@ -246,10 +310,11 @@ export default function ReservationsPage() {
 
                           <button
                             type="button"
-                            disabled
-                            className="cursor-not-allowed rounded-xl border border-zinc-800 px-4 py-2 text-xs font-bold uppercase tracking-wide text-zinc-600"
+                            disabled={isUpdating || isCancellingReservation}
+                            onClick={() => removeReservationItem(item.id)}
+                            className="rounded-xl border border-red-500/40 px-4 py-2 text-xs font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
                           >
-                            Quitar pronto
+                            {isUpdating ? "Quitando..." : "Quitar"}
                           </button>
                         </div>
                       </div>
@@ -302,10 +367,13 @@ export default function ReservationsPage() {
 
                 <button
                   type="button"
-                  disabled
-                  className="mt-6 w-full cursor-not-allowed rounded-xl border border-zinc-800 px-4 py-3 text-sm font-bold uppercase tracking-wide text-zinc-600"
+                  disabled={isCancellingReservation || reservationItems.length === 0}
+                  onClick={cancelReservation}
+                  className="mt-6 w-full rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
                 >
-                  Cancelar reserva pronto
+                  {isCancellingReservation
+                    ? "Cancelando..."
+                    : "Cancelar reserva completa"}
                 </button>
               </aside>
             </section>
