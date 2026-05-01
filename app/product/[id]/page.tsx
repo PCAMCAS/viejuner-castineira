@@ -1,131 +1,267 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { products } from "../../_data/catalog";
+"use client";
 
-type ProductPageProps = {
-  params: Promise<{
-    id: string;
-  }>;
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { AuthGuard } from "../../_components/auth-guard";
+import { gameSystems } from "../../_data/catalog";
+import { supabase } from "../../../lib/supabase/client";
+
+type Product = {
+  id: number;
+  name: string;
+  description: string | null;
+  price: number;
+  image_url: string | null;
+  game_system: string;
+  faction: string;
+  condition: string;
+  status: "available" | "reserved" | "sold" | "hidden";
+  is_visible: boolean;
 };
 
-export default async function ProductPage({ params }: ProductPageProps) {
-  const { id } = await params;
+function getSystemName(systemSlug: string) {
+  return (
+    gameSystems.find((system) => system.slug === systemSlug)?.name ??
+    systemSlug
+  );
+}
 
-  const product = products.find((item) => item.id === Number(id));
-
-  if (!product) {
-    notFound();
+function getStatusLabel(status: Product["status"]) {
+  if (status === "reserved") {
+    return "Reservado";
   }
 
-  const isReserved = product.status === "Reservado";
+  if (status === "sold") {
+    return "Vendido";
+  }
+
+  if (status === "hidden") {
+    return "Oculto";
+  }
+
+  return "Disponible";
+}
+
+export default function ProductPage() {
+  const params = useParams<{ id: string }>();
+  const productId = Number(params.id);
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadProduct() {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      if (!productId) {
+        setErrorMessage("Producto no válido.");
+        setIsLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("products")
+        .select(
+          "id, name, description, price, image_url, game_system, faction, condition, status, is_visible",
+        )
+        .eq("id", productId)
+        .eq("is_visible", true)
+        .in("status", ["available", "reserved"])
+        .single();
+
+      if (error) {
+        setErrorMessage("No se ha encontrado este producto.");
+        setProduct(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setProduct(data as Product);
+      setIsLoading(false);
+    }
+
+    loadProduct();
+  }, [productId]);
+
+  const isReserved = product?.status === "reserved";
 
   return (
-    <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
-      <section className="mx-auto max-w-6xl">
-        <header className="flex flex-col gap-6 border-b border-zinc-800 pb-8 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-500">
-              Detalle del producto
-            </p>
+    <AuthGuard>
+      <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
+        <section className="mx-auto max-w-6xl">
+          {isLoading ? (
+            <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-8 text-center shadow-2xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-500">
+                Detalle del producto
+              </p>
 
-            <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
-              {product.name}
-            </h1>
+              <h1 className="mt-3 text-3xl font-black">
+                Cargando producto...
+              </h1>
 
-            <p className="mt-4 max-w-2xl text-zinc-400">
-              Revisa el sistema, facción, estado físico y disponibilidad antes
-              de añadirlo a tu cesta de reservas.
-            </p>
-          </div>
+              <p className="mt-3 text-sm text-zinc-400">
+                Leyendo la miniatura desde Supabase.
+              </p>
+            </section>
+          ) : null}
 
-          <nav className="flex flex-wrap items-center gap-4">
-            <Link
-              href="/catalog"
-              className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400"
-            >
-              Volver al catálogo
-            </Link>
+          {!isLoading && errorMessage ? (
+            <section className="rounded-2xl border border-red-500/40 bg-red-500/10 p-8 text-center text-red-200 shadow-2xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.3em]">
+                Producto no disponible
+              </p>
 
-            <Link
-              href="/reservations"
-              className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
-            >
-              Mis reservas
-            </Link>
-          </nav>
-        </header>
+              <h1 className="mt-3 text-3xl font-black">{errorMessage}</h1>
 
-        <section className="mt-8 grid gap-8 lg:grid-cols-[1fr_420px]">
-          <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
-            <div className="flex aspect-[4/3] items-center justify-center bg-zinc-950">
-              <span className="text-sm font-semibold uppercase tracking-[0.3em] text-zinc-700">
-                Imagen del producto
-              </span>
-            </div>
-          </div>
+              <p className="mt-4 text-sm">
+                Puede que el producto esté vendido, oculto o que ya no exista.
+              </p>
 
-          <aside className="h-fit rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
-                  {product.system}
-                </p>
-
-                <h2 className="mt-2 text-2xl font-black">{product.name}</h2>
-              </div>
-
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
-                  isReserved
-                    ? "bg-zinc-800 text-zinc-400"
-                    : "bg-emerald-500/10 text-emerald-400"
-                }`}
+              <Link
+                href="/catalog"
+                className="mt-6 inline-block rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400"
               >
-                {product.status}
-              </span>
-            </div>
+                Volver al catálogo
+              </Link>
+            </section>
+          ) : null}
 
-            <div className="mt-6 space-y-4 rounded-2xl border border-zinc-800 bg-zinc-950/50 p-5 text-sm text-zinc-400">
-              <div className="flex items-center justify-between gap-4">
-                <span>Facción</span>
-                <span className="font-bold text-zinc-100">
-                  {product.faction}
-                </span>
-              </div>
+          {!isLoading && product ? (
+            <>
+              <header className="flex flex-col gap-6 border-b border-zinc-800 pb-8 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-500">
+                    Detalle del producto
+                  </p>
 
-              <div className="flex items-center justify-between gap-4">
-                <span>Estado físico</span>
-                <span className="font-bold text-zinc-100">
-                  {product.condition}
-                </span>
-              </div>
+                  <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
+                    {product.name}
+                  </h1>
 
-              <div className="flex items-center justify-between gap-4 border-t border-zinc-800 pt-4">
-                <span>Precio</span>
-                <span className="text-3xl font-black text-zinc-100">
-                  {product.price} €
-                </span>
-              </div>
-            </div>
+                  <p className="mt-4 max-w-2xl text-zinc-400">
+                    Revisa el sistema, facción, estado físico y disponibilidad
+                    antes de añadirlo a tu cesta de reservas.
+                  </p>
+                </div>
 
-            <div className="mt-6 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
-              Las reservas duran 7 días. La venta final se cerrará por
-              WhatsApp, sin pago online.
-            </div>
+                <nav className="flex flex-wrap items-center gap-4">
+                  <Link
+                    href="/catalog"
+                    className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400"
+                  >
+                    Volver al catálogo
+                  </Link>
 
-            <button
-              disabled={isReserved}
-              className={`mt-6 w-full rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide transition ${
-                isReserved
-                  ? "cursor-not-allowed bg-zinc-800 text-zinc-500"
-                  : "bg-amber-500 text-zinc-950 hover:bg-amber-400"
-              }`}
-            >
-              {isReserved ? "Producto reservado" : "Reservar producto"}
-            </button>
-          </aside>
+                  <Link
+                    href="/reservations"
+                    className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
+                  >
+                    Mis reservas
+                  </Link>
+                </nav>
+              </header>
+
+              <section className="mt-8 grid gap-8 lg:grid-cols-[1fr_420px]">
+                <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+                  <div className="aspect-[4/3] overflow-hidden bg-zinc-950">
+                    {product.image_url ? (
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <span className="text-sm font-semibold uppercase tracking-[0.3em] text-zinc-700">
+                          Sin imagen
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <aside className="h-fit rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
+                        {getSystemName(product.game_system)}
+                      </p>
+
+                      <h2 className="mt-2 text-2xl font-black">
+                        {product.name}
+                      </h2>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                        isReserved
+                          ? "bg-zinc-800 text-zinc-400"
+                          : "bg-emerald-500/10 text-emerald-400"
+                      }`}
+                    >
+                      {getStatusLabel(product.status)}
+                    </span>
+                  </div>
+
+                  {product.description ? (
+                    <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950/50 p-5">
+                      <p className="text-sm font-bold uppercase tracking-[0.2em] text-zinc-500">
+                        Descripción
+                      </p>
+
+                      <p className="mt-3 text-sm leading-6 text-zinc-300">
+                        {product.description}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-6 space-y-4 rounded-2xl border border-zinc-800 bg-zinc-950/50 p-5 text-sm text-zinc-400">
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Facción</span>
+                      <span className="font-bold text-zinc-100">
+                        {product.faction}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Estado físico</span>
+                      <span className="font-bold text-zinc-100">
+                        {product.condition}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4 border-t border-zinc-800 pt-4">
+                      <span>Precio</span>
+                      <span className="text-3xl font-black text-zinc-100">
+                        {Number(product.price)} €
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
+                    Las reservas duran 7 días. La venta final se cerrará por
+                    WhatsApp, sin pago online.
+                  </div>
+
+                  <button
+                    disabled={isReserved}
+                    className={`mt-6 w-full rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide transition ${
+                      isReserved
+                        ? "cursor-not-allowed bg-zinc-800 text-zinc-500"
+                        : "bg-amber-500 text-zinc-950 hover:bg-amber-400"
+                    }`}
+                  >
+                    {isReserved ? "Producto reservado" : "Reservar producto"}
+                  </button>
+                </aside>
+              </section>
+            </>
+          ) : null}
         </section>
-      </section>
-    </main>
+      </main>
+    </AuthGuard>
   );
 }
