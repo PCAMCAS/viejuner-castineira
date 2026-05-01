@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "../_components/page-header";
 
 const adminStats = [
   {
@@ -52,38 +53,28 @@ export default function AdminPage() {
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
       <section className="mx-auto max-w-7xl">
-        <header className="flex flex-col gap-6 border-b border-zinc-800 pb-8 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-500">
-              Panel privado
-            </p>
+        <PageHeader
+          eyebrow="Panel privado"
+          title="Administración"
+          description="Gestiona productos, reservas y ventas sin tocar el código de la aplicación."
+          actions={
+            <nav className="flex flex-wrap items-center gap-4">
+              <Link
+                href="/catalog"
+                className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400"
+              >
+                Ver catálogo
+              </Link>
 
-            <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
-              Administración
-            </h1>
-
-            <p className="mt-4 max-w-2xl text-zinc-400">
-              Gestiona productos, reservas y ventas sin tocar el código de la
-              aplicación.
-            </p>
-          </div>
-
-          <nav className="flex flex-wrap items-center gap-4">
-            <Link
-              href="/catalog"
-              className="rounded-full border border-zinc-700 px-5 py-2 text-sm font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400"
-            >
-              Ver catálogo
-            </Link>
-
-            <Link
-              href="/"
-              className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
-            >
-              Salir
-            </Link>
-          </nav>
-        </header>
+              <Link
+                href="/"
+                className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
+              >
+                Salir
+              </Link>
+            </nav>
+          }
+        />
 
         <section className="mt-8 grid gap-4 md:grid-cols-3">
           {adminStats.map((stat) => (
