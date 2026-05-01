@@ -121,6 +121,9 @@ export default function AdminReservationsPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [updatingReservationId, setUpdatingReservationId] = useState<
+    number | null
+  >(null);
 
   async function loadReservations() {
     setIsLoading(true);
@@ -167,6 +170,58 @@ export default function AdminReservationsPage() {
 
     setReservations(normalizedReservations);
     setIsLoading(false);
+  }
+
+  async function markReservationAsSold(reservationId: number) {
+    const confirmSold = window.confirm(
+      "¿Seguro que quieres marcar esta reserva como vendida? Los productos pasarán a vendidos y desaparecerán del catálogo.",
+    );
+
+    if (!confirmSold) {
+      return;
+    }
+
+    setUpdatingReservationId(reservationId);
+    setErrorMessage("");
+
+    const { error } = await supabase.rpc("admin_mark_reservation_sold", {
+      reservation_id_input: reservationId,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setUpdatingReservationId(null);
+      return;
+    }
+
+    await loadReservations();
+    setUpdatingReservationId(null);
+  }
+
+  async function cancelReservation(reservationId: number) {
+    const confirmCancel = window.confirm(
+      "¿Seguro que quieres cancelar esta reserva? Los productos volverán a estar disponibles en el catálogo.",
+    );
+
+    if (!confirmCancel) {
+      return;
+    }
+
+    setUpdatingReservationId(reservationId);
+    setErrorMessage("");
+
+    const { error } = await supabase.rpc("admin_cancel_reservation", {
+      reservation_id_input: reservationId,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setUpdatingReservationId(null);
+      return;
+    }
+
+    await loadReservations();
+    setUpdatingReservationId(null);
   }
 
   useEffect(() => {
@@ -224,7 +279,7 @@ export default function AdminReservationsPage() {
 
           {errorMessage ? (
             <section className="mt-8 rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-red-200">
-              <p className="font-bold">No se han podido cargar las reservas.</p>
+              <p className="font-bold">No se ha podido completar la acción.</p>
               <p className="mt-2 text-sm">{errorMessage}</p>
             </section>
           ) : null}
@@ -247,6 +302,7 @@ export default function AdminReservationsPage() {
                 const profile = reservation.profiles;
                 const items = reservation.reservation_items ?? [];
                 const total = getReservationTotal(items);
+                const isUpdating = updatingReservationId === reservation.id;
 
                 return (
                   <article
@@ -351,18 +407,20 @@ export default function AdminReservationsPage() {
                     <div className="mt-6 flex flex-wrap gap-3">
                       <button
                         type="button"
-                        disabled
-                        className="cursor-not-allowed rounded-xl border border-zinc-800 px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-600"
+                        disabled={isUpdating}
+                        onClick={() => markReservationAsSold(reservation.id)}
+                        className="rounded-xl bg-amber-500 px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
                       >
-                        Marcar vendida pronto
+                        {isUpdating ? "Actualizando..." : "Marcar vendida"}
                       </button>
 
                       <button
                         type="button"
-                        disabled
-                        className="cursor-not-allowed rounded-xl border border-zinc-800 px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-600"
+                        disabled={isUpdating}
+                        onClick={() => cancelReservation(reservation.id)}
+                        className="rounded-xl border border-red-500/40 px-4 py-3 text-xs font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
                       >
-                        Cancelar pronto
+                        {isUpdating ? "Actualizando..." : "Cancelar reserva"}
                       </button>
                     </div>
                   </article>
