@@ -83,9 +83,12 @@ export default function AdminProductsPage() {
                   <p className="text-2xl font-black">{product.price} €</p>
 
                   <div className="flex flex-wrap gap-2">
-                    <button className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400">
+                    <Link
+                      href={`/admin/products/${product.id}/edit`}
+                      className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400"
+                    >
                       Editar
-                    </button>
+                    </Link>
 
                     <button className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400">
                       Ocultar
