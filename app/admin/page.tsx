@@ -1,5 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { LogoutButton } from "../_components/logout-button";
 import { PageHeader } from "../_components/page-header";
+import { supabase } from "../../lib/supabase/client";
 
 const adminStats = [
   {
@@ -50,6 +56,56 @@ const recentReservations = [
 ];
 
 export default function AdminPage() {
+  const router = useRouter();
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  useEffect(() => {
+    async function checkAdminAccess() {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        router.replace("/login");
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || profile?.role !== "admin") {
+        router.replace("/catalog");
+        return;
+      }
+
+      setIsCheckingAccess(false);
+    }
+
+    checkAdminAccess();
+  }, [router]);
+
+  if (isCheckingAccess) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-zinc-950 px-6 text-zinc-100">
+        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-8 text-center shadow-2xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-500">
+            Comprobando acceso
+          </p>
+
+          <h1 className="mt-3 text-3xl font-black">Panel privado</h1>
+
+          <p className="mt-3 text-sm text-zinc-400">
+            Verificando si tu cuenta tiene permisos de administrador.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
       <section className="mx-auto max-w-7xl">
@@ -66,12 +122,7 @@ export default function AdminPage() {
                 Ver catálogo
               </Link>
 
-              <Link
-                href="/"
-                className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
-              >
-                Salir
-              </Link>
+              <LogoutButton className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400" />
             </nav>
           }
         />
