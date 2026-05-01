@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoutButton } from "../_components/logout-button";
 import { PageHeader } from "../_components/page-header";
 import { factions, gameSystems, products } from "../_data/catalog";
 
@@ -77,12 +78,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                 Mis reservas
               </Link>
 
-              <Link
-                href="/"
-                className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
-              >
-                Salir
-              </Link>
+              <LogoutButton className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400" />
             </nav>
           }
         />
