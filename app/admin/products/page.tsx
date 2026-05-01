@@ -1,8 +1,76 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { AdminGuard } from "../../_components/admin-guard";
-import { products } from "../../_data/catalog";
+import { supabase } from "../../../lib/supabase/client";
+
+type Product = {
+  id: number;
+  name: string;
+  description: string | null;
+  price: number;
+  image_url: string | null;
+  game_system: string;
+  faction: string;
+  condition: string;
+  status: "available" | "reserved" | "sold" | "hidden";
+  is_visible: boolean;
+};
+
+function getSystemName(system: string) {
+  const systemNames: Record<string, string> = {
+    "40k": "Warhammer 40K",
+    aos: "Age of Sigmar",
+    fantasy: "Warhammer Fantasy",
+    otros: "Otros",
+  };
+
+  return systemNames[system] ?? system;
+}
+
+function getStatusLabel(status: Product["status"]) {
+  const statusLabels: Record<Product["status"], string> = {
+    available: "Disponible",
+    reserved: "Reservado",
+    sold: "Vendido",
+    hidden: "Oculto",
+  };
+
+  return statusLabels[status];
+}
 
 export default function AdminProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadProducts() {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      const { data, error } = await supabase
+        .from("products")
+        .select(
+          "id, name, description, price, image_url, game_system, faction, condition, status, is_visible",
+        )
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        setErrorMessage(error.message);
+        setProducts([]);
+        setIsLoading(false);
+        return;
+      }
+
+      setProducts((data ?? []) as Product[]);
+      setIsLoading(false);
+    }
+
+    loadProducts();
+  }, []);
+
   return (
     <AdminGuard>
       <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
@@ -18,8 +86,9 @@ export default function AdminProductsPage() {
               </h1>
 
               <p className="mt-4 max-w-2xl text-zinc-400">
-                Revisa los items del catálogo, cambia su visibilidad o márcalos
-                como vendidos cuando una reserva se cierre.
+                Revisa los items reales guardados en Supabase, cambia su
+                visibilidad o márcalos como vendidos cuando una reserva se
+                cierre.
               </p>
             </div>
 
@@ -40,71 +109,143 @@ export default function AdminProductsPage() {
             </nav>
           </header>
 
-          <section className="mt-8 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 shadow-2xl">
-            <div className="grid grid-cols-1 gap-4 border-b border-zinc-800 p-5 text-sm font-bold uppercase tracking-[0.2em] text-zinc-500 md:grid-cols-[1fr_160px_160px_130px_220px]">
-              <span>Producto</span>
-              <span>Sistema</span>
-              <span>Facción</span>
-              <span>Precio</span>
-              <span>Acciones</span>
-            </div>
+          {errorMessage ? (
+            <section className="mt-8 rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-red-200">
+              <p className="font-bold">No se han podido cargar los productos.</p>
+              <p className="mt-2 text-sm">{errorMessage}</p>
+            </section>
+          ) : null}
 
-            <div className="divide-y divide-zinc-800">
-              {products.map((product) => {
-                const isReserved = product.status === "Reservado";
+          {isLoading ? (
+            <section className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-10 text-center">
+              <p className="text-lg font-bold text-zinc-100">
+                Cargando productos...
+              </p>
 
-                return (
-                  <article
-                    key={product.id}
-                    className="grid grid-cols-1 gap-4 p-5 md:grid-cols-[1fr_160px_160px_130px_220px] md:items-center"
-                  >
-                    <div>
-                      <p className="text-lg font-black text-zinc-100">
-                        {product.name}
+              <p className="mt-3 text-sm text-zinc-400">
+                Leyendo el inventario desde Supabase.
+              </p>
+            </section>
+          ) : null}
+
+          {!isLoading && !errorMessage && products.length === 0 ? (
+            <section className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-10 text-center">
+              <p className="text-lg font-bold text-zinc-100">
+                Todavía no hay productos.
+              </p>
+
+              <p className="mt-3 text-sm text-zinc-400">
+                Crea el primer producto desde el panel de administración.
+              </p>
+
+              <Link
+                href="/admin/products/new"
+                className="mt-6 inline-block rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400"
+              >
+                Crear producto
+              </Link>
+            </section>
+          ) : null}
+
+          {!isLoading && products.length > 0 ? (
+            <section className="mt-8 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 shadow-2xl">
+              <div className="grid grid-cols-1 gap-4 border-b border-zinc-800 p-5 text-sm font-bold uppercase tracking-[0.2em] text-zinc-500 md:grid-cols-[1fr_150px_150px_120px_230px]">
+                <span>Producto</span>
+                <span>Sistema</span>
+                <span>Facción</span>
+                <span>Precio</span>
+                <span>Acciones</span>
+              </div>
+
+              <div className="divide-y divide-zinc-800">
+                {products.map((product) => {
+                  const isReserved = product.status === "reserved";
+                  const isSold = product.status === "sold";
+                  const isHidden = product.status === "hidden" || !product.is_visible;
+
+                  return (
+                    <article
+                      key={product.id}
+                      className="grid grid-cols-1 gap-4 p-5 md:grid-cols-[1fr_150px_150px_120px_230px] md:items-center"
+                    >
+                      <div className="flex gap-4">
+                        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
+                          {product.image_url ? (
+                            <img
+                              src={product.image_url}
+                              alt={product.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-wide text-zinc-700">
+                              Sin foto
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="text-lg font-black text-zinc-100">
+                            {product.name}
+                          </p>
+
+                          <p className="mt-1 text-sm text-zinc-400">
+                            Estado físico: {product.condition}
+                          </p>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <span
+                              className={`inline-block rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                                isReserved
+                                  ? "bg-zinc-800 text-zinc-400"
+                                  : isSold
+                                    ? "bg-red-500/10 text-red-300"
+                                    : "bg-emerald-500/10 text-emerald-400"
+                              }`}
+                            >
+                              {getStatusLabel(product.status)}
+                            </span>
+
+                            {isHidden ? (
+                              <span className="inline-block rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold uppercase tracking-wide text-zinc-400">
+                                No visible
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="text-sm text-zinc-300">
+                        {getSystemName(product.game_system)}
                       </p>
 
-                      <p className="mt-1 text-sm text-zinc-400">
-                        Estado físico: {product.condition}
+                      <p className="text-sm text-zinc-300">{product.faction}</p>
+
+                      <p className="text-2xl font-black">
+                        {Number(product.price)} €
                       </p>
 
-                      <span
-                        className={`mt-3 inline-block rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
-                          isReserved
-                            ? "bg-zinc-800 text-zinc-400"
-                            : "bg-emerald-500/10 text-emerald-400"
-                        }`}
-                      >
-                        {product.status}
-                      </span>
-                    </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/admin/products/${product.id}/edit`}
+                          className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400"
+                        >
+                          Editar
+                        </Link>
 
-                    <p className="text-sm text-zinc-300">{product.system}</p>
+                        <button className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400">
+                          Ocultar
+                        </button>
 
-                    <p className="text-sm text-zinc-300">{product.faction}</p>
-
-                    <p className="text-2xl font-black">{product.price} €</p>
-
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/admin/products/${product.id}/edit`}
-                        className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400"
-                      >
-                        Editar
-                      </Link>
-
-                      <button className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400">
-                        Ocultar
-                      </button>
-
-                      <button className="rounded-xl border border-red-500/40 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200">
-                        Vendido
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
+                        <button className="rounded-xl border border-red-500/40 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200">
+                          Vendido
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
         </section>
       </main>
     </AdminGuard>
