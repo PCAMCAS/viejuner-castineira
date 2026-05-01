@@ -54,7 +54,11 @@ export default function CatalogContent() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [reservingProductId, setReservingProductId] = useState<number | null>(
+    null,
+  );
 
   const availableFactions =
     selectedSystem === "all"
@@ -64,41 +68,78 @@ export default function CatalogContent() {
             faction.id === "all" || faction.gameSystemId === selectedSystem,
         );
 
-  useEffect(() => {
-    async function loadProducts() {
-      setIsLoading(true);
-      setErrorMessage("");
+  async function loadProducts() {
+    setIsLoading(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
-      const { error: expireError } = await supabase.rpc(
-        "expire_old_reservations",
-      );
+    const { error: expireError } = await supabase.rpc(
+      "expire_old_reservations",
+    );
 
-      if (expireError) {
-        setErrorMessage(expireError.message);
-        setProducts([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("products")
-        .select(
-          "id, name, description, price, image_url, game_system, faction, condition, status, is_visible",
-        )
-        .eq("is_visible", true)
-        .in("status", ["available", "reserved"]);
-
-      if (error) {
-        setErrorMessage(error.message);
-        setProducts([]);
-        setIsLoading(false);
-        return;
-      }
-
-      setProducts((data ?? []) as Product[]);
+    if (expireError) {
+      setErrorMessage(expireError.message);
+      setProducts([]);
       setIsLoading(false);
+      return;
     }
 
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        "id, name, description, price, image_url, game_system, faction, condition, status, is_visible",
+      )
+      .eq("is_visible", true)
+      .in("status", ["available", "reserved"]);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setProducts([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setProducts((data ?? []) as Product[]);
+    setIsLoading(false);
+  }
+
+  async function handleReserveProduct(product: Product) {
+    if (product.status === "reserved") {
+      return;
+    }
+
+    setReservingProductId(product.id);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const { error } = await supabase.rpc("reserve_product", {
+      product_id_input: product.id,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setReservingProductId(null);
+      return;
+    }
+
+    setProducts((currentProducts) =>
+      currentProducts.map((currentProduct) => {
+        if (currentProduct.id !== product.id) {
+          return currentProduct;
+        }
+
+        return {
+          ...currentProduct,
+          status: "reserved",
+        };
+      }),
+    );
+
+    setSuccessMessage(`Has reservado "${product.name}".`);
+    setReservingProductId(null);
+  }
+
+  useEffect(() => {
     loadProducts();
   }, []);
 
@@ -258,8 +299,21 @@ export default function CatalogContent() {
 
           {errorMessage ? (
             <section className="mt-8 rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-red-200">
-              <p className="font-bold">No se han podido cargar los productos.</p>
+              <p className="font-bold">No se ha podido completar la acción.</p>
               <p className="mt-2 text-sm">{errorMessage}</p>
+            </section>
+          ) : null}
+
+          {successMessage ? (
+            <section className="mt-8 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-6 text-emerald-200">
+              <p className="font-bold">{successMessage}</p>
+
+              <Link
+                href="/reservations"
+                className="mt-3 inline-block text-sm font-bold text-amber-400 transition hover:text-amber-300"
+              >
+                Ver mis reservas
+              </Link>
             </section>
           ) : null}
 
@@ -279,6 +333,7 @@ export default function CatalogContent() {
             <section className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {filteredProducts.map((product) => {
                 const isReserved = product.status === "reserved";
+                const isReserving = reservingProductId === product.id;
 
                 return (
                   <article
@@ -336,20 +391,26 @@ export default function CatalogContent() {
                         <p>Estado: {product.condition}</p>
                       </div>
 
-                      <div className="mt-6 flex items-center justify-between">
+                      <div className="mt-6 flex items-center justify-between gap-4">
                         <p className="text-3xl font-black">
                           {Number(product.price)} €
                         </p>
 
                         <button
-                          disabled={isReserved}
+                          type="button"
+                          disabled={isReserved || isReserving}
+                          onClick={() => handleReserveProduct(product)}
                           className={`rounded-xl px-5 py-3 text-sm font-bold uppercase tracking-wide transition ${
                             isReserved
                               ? "cursor-not-allowed bg-zinc-800 text-zinc-500"
-                              : "bg-amber-500 text-zinc-950 hover:bg-amber-400"
+                              : "bg-amber-500 text-zinc-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
                           }`}
                         >
-                          {isReserved ? "Reservado" : "Reservar"}
+                          {isReserving
+                            ? "Reservando..."
+                            : isReserved
+                              ? "Reservado"
+                              : "Reservar"}
                         </button>
                       </div>
 
