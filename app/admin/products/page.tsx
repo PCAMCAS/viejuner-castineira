@@ -44,30 +44,95 @@ export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [updatingProductId, setUpdatingProductId] = useState<number | null>(
+    null,
+  );
 
-  useEffect(() => {
-    async function loadProducts() {
-      setIsLoading(true);
-      setErrorMessage("");
+  async function loadProducts() {
+    setIsLoading(true);
+    setErrorMessage("");
 
-      const { data, error } = await supabase
-        .from("products")
-        .select(
-          "id, name, description, price, image_url, game_system, faction, condition, status, is_visible",
-        )
-        .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        "id, name, description, price, image_url, game_system, faction, condition, status, is_visible",
+      )
+      .order("created_at", { ascending: false });
 
-      if (error) {
-        setErrorMessage(error.message);
-        setProducts([]);
-        setIsLoading(false);
-        return;
-      }
-
-      setProducts((data ?? []) as Product[]);
+    if (error) {
+      setErrorMessage(error.message);
+      setProducts([]);
       setIsLoading(false);
+      return;
     }
 
+    setProducts((data ?? []) as Product[]);
+    setIsLoading(false);
+  }
+
+  async function hideProduct(productId: number) {
+    const confirmHide = window.confirm(
+      "¿Seguro que quieres ocultar este producto del catálogo?",
+    );
+
+    if (!confirmHide) {
+      return;
+    }
+
+    setUpdatingProductId(productId);
+    setErrorMessage("");
+
+    const { error } = await supabase
+      .from("products")
+      .update({
+        is_visible: false,
+        status: "hidden",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setUpdatingProductId(null);
+      return;
+    }
+
+    await loadProducts();
+    setUpdatingProductId(null);
+  }
+
+  async function markProductAsSold(productId: number) {
+    const confirmSold = window.confirm(
+      "¿Seguro que quieres marcar este producto como vendido? Desaparecerá del catálogo.",
+    );
+
+    if (!confirmSold) {
+      return;
+    }
+
+    setUpdatingProductId(productId);
+    setErrorMessage("");
+
+    const { error } = await supabase
+      .from("products")
+      .update({
+        status: "sold",
+        is_visible: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId);
+
+    if (error) {
+      setErrorMessage(error.message);
+      setUpdatingProductId(null);
+      return;
+    }
+
+    await loadProducts();
+    setUpdatingProductId(null);
+  }
+
+  useEffect(() => {
     loadProducts();
   }, []);
 
@@ -111,7 +176,7 @@ export default function AdminProductsPage() {
 
           {errorMessage ? (
             <section className="mt-8 rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-red-200">
-              <p className="font-bold">No se han podido cargar los productos.</p>
+              <p className="font-bold">No se ha podido completar la acción.</p>
               <p className="mt-2 text-sm">{errorMessage}</p>
             </section>
           ) : null}
@@ -161,7 +226,9 @@ export default function AdminProductsPage() {
                 {products.map((product) => {
                   const isReserved = product.status === "reserved";
                   const isSold = product.status === "sold";
-                  const isHidden = product.status === "hidden" || !product.is_visible;
+                  const isHidden =
+                    product.status === "hidden" || !product.is_visible;
+                  const isUpdating = updatingProductId === product.id;
 
                   return (
                     <article
@@ -232,12 +299,22 @@ export default function AdminProductsPage() {
                           Editar
                         </Link>
 
-                        <button className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400">
-                          Ocultar
+                        <button
+                          type="button"
+                          disabled={isUpdating || isHidden || isSold}
+                          onClick={() => hideProduct(product.id)}
+                          className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold uppercase tracking-wide text-zinc-300 transition hover:border-amber-500 hover:text-amber-400 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
+                        >
+                          {isUpdating ? "..." : "Ocultar"}
                         </button>
 
-                        <button className="rounded-xl border border-red-500/40 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200">
-                          Vendido
+                        <button
+                          type="button"
+                          disabled={isUpdating || isSold}
+                          onClick={() => markProductAsSold(product.id)}
+                          className="rounded-xl border border-red-500/40 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
+                        >
+                          {isUpdating ? "..." : "Vendido"}
                         </button>
                       </div>
                     </article>
