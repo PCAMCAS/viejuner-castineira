@@ -79,12 +79,21 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
             </p>
           </div>
 
-          <Link
-            href="/"
-            className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
-          >
-            Salir
-          </Link>
+          <nav className="flex flex-wrap items-center gap-4">
+            <Link
+              href="/reservations"
+              className="rounded-full border border-amber-500/50 px-5 py-2 text-sm font-bold uppercase tracking-wide text-amber-400 transition hover:border-amber-400 hover:text-amber-300"
+            >
+              Mis reservas
+            </Link>
+
+            <Link
+              href="/"
+              className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
+            >
+              Salir
+            </Link>
+          </nav>
         </header>
 
         <form
