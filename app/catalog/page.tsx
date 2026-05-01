@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "../_components/page-header";
 import { factions, gameSystems, products } from "../_data/catalog";
 
 type CatalogSearchParams = {
@@ -63,38 +64,28 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
       <section className="mx-auto max-w-7xl">
-        <header className="flex flex-col gap-6 border-b border-zinc-800 pb-8 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-500">
-              Catálogo privado
-            </p>
+        <PageHeader
+          eyebrow="Catálogo privado"
+          title="Miniaturas disponibles"
+          description="Filtra por sistema, facción y precio. Los productos reservados se muestran en el catálogo, pero no se pueden volver a reservar."
+          actions={
+            <nav className="flex flex-wrap items-center gap-4">
+              <Link
+                href="/reservations"
+                className="rounded-full border border-amber-500/50 px-5 py-2 text-sm font-bold uppercase tracking-wide text-amber-400 transition hover:border-amber-400 hover:text-amber-300"
+              >
+                Mis reservas
+              </Link>
 
-            <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
-              Miniaturas disponibles
-            </h1>
-
-            <p className="mt-4 max-w-2xl text-zinc-400">
-              Filtra por sistema, facción y precio. Los productos reservados se
-              muestran en el catálogo, pero no se pueden volver a reservar.
-            </p>
-          </div>
-
-          <nav className="flex flex-wrap items-center gap-4">
-            <Link
-              href="/reservations"
-              className="rounded-full border border-amber-500/50 px-5 py-2 text-sm font-bold uppercase tracking-wide text-amber-400 transition hover:border-amber-400 hover:text-amber-300"
-            >
-              Mis reservas
-            </Link>
-
-            <Link
-              href="/"
-              className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
-            >
-              Salir
-            </Link>
-          </nav>
-        </header>
+              <Link
+                href="/"
+                className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
+              >
+                Salir
+              </Link>
+            </nav>
+          }
+        />
 
         <form
           action="/catalog"
@@ -203,11 +194,16 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                   key={product.id}
                   className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl"
                 >
-                  <div className="flex aspect-[4/3] items-center justify-center bg-zinc-950">
-                    <span className="text-sm font-semibold uppercase tracking-[0.3em] text-zinc-700">
-                      Imagen
-                    </span>
-                  </div>
+                  <Link
+                    href={`/product/${product.id}`}
+                    className="block focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-zinc-950"
+                  >
+                    <div className="flex aspect-[4/3] items-center justify-center bg-zinc-950 transition hover:bg-zinc-900">
+                      <span className="text-sm font-semibold uppercase tracking-[0.3em] text-zinc-700">
+                        Imagen
+                      </span>
+                    </div>
+                  </Link>
 
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-4">
@@ -216,9 +212,11 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                           {product.system}
                         </p>
 
-                        <h2 className="mt-2 text-xl font-black">
-                          {product.name}
-                        </h2>
+                        <Link href={`/product/${product.id}`}>
+                          <h2 className="mt-2 text-xl font-black transition hover:text-amber-400">
+                            {product.name}
+                          </h2>
+                        </Link>
                       </div>
 
                       <span
@@ -251,6 +249,13 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
                         {isReserved ? "Reservado" : "Reservar"}
                       </button>
                     </div>
+
+                    <Link
+                      href={`/product/${product.id}`}
+                      className="mt-4 inline-block text-sm font-bold text-amber-400 transition hover:text-amber-300"
+                    >
+                      Ver detalle
+                    </Link>
                   </div>
                 </article>
               );
