@@ -91,6 +91,17 @@ export default function ReservationsPage() {
       return;
     }
 
+    const { error: expireError } = await supabase.rpc(
+      "expire_old_reservations",
+    );
+
+    if (expireError) {
+      setErrorMessage(expireError.message);
+      setReservation(null);
+      setIsLoading(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("reservations")
       .select(
@@ -367,7 +378,9 @@ export default function ReservationsPage() {
 
                 <button
                   type="button"
-                  disabled={isCancellingReservation || reservationItems.length === 0}
+                  disabled={
+                    isCancellingReservation || reservationItems.length === 0
+                  }
                   onClick={cancelReservation}
                   className="mt-6 w-full rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
                 >
