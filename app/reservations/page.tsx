@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "../_components/page-header";
 
 const reservationItems = [
   {
@@ -32,29 +33,19 @@ export default function ReservationsPage() {
   return (
     <main className="min-h-screen bg-zinc-950 px-6 py-10 text-zinc-100">
       <section className="mx-auto max-w-5xl">
-        <header className="flex flex-col gap-6 border-b border-zinc-800 pb-8 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-500">
-              Cesta de reservas
-            </p>
-
-            <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">
-              Mis reservas
-            </h1>
-
-            <p className="mt-4 max-w-2xl text-zinc-400">
-              Estos productos quedan reservados durante 7 días. Finaliza el
-              pedido por WhatsApp antes de que caduque la reserva.
-            </p>
-          </div>
-
-          <Link
-            href="/catalog"
-            className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
-          >
-            Volver al catálogo
-          </Link>
-        </header>
+        <PageHeader
+          eyebrow="Cesta de reservas"
+          title="Mis reservas"
+          description="Estos productos quedan reservados durante 7 días. Finaliza el pedido por WhatsApp antes de que caduque la reserva."
+          actions={
+            <Link
+              href="/catalog"
+              className="text-sm font-semibold text-zinc-400 transition hover:text-amber-400"
+            >
+              Volver al catálogo
+            </Link>
+          }
+        />
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_320px]">
           <div className="space-y-4">
