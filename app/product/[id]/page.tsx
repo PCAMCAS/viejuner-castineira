@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthGuard } from "../../_components/auth-guard";
 import { gameSystems } from "../../_data/catalog";
@@ -45,44 +45,77 @@ function getStatusLabel(status: Product["status"]) {
 
 export default function ProductPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const productId = Number(params.id);
 
   const [product, setProduct] = useState<Product | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isReserving, setIsReserving] = useState(false);
 
-  useEffect(() => {
-    async function loadProduct() {
-      setIsLoading(true);
-      setErrorMessage("");
+  async function loadProduct() {
+    setIsLoading(true);
+    setErrorMessage("");
+    setSuccessMessage("");
 
-      if (!productId) {
-        setErrorMessage("Producto no válido.");
-        setIsLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("products")
-        .select(
-          "id, name, description, price, image_url, game_system, faction, condition, status, is_visible",
-        )
-        .eq("id", productId)
-        .eq("is_visible", true)
-        .in("status", ["available", "reserved"])
-        .single();
-
-      if (error) {
-        setErrorMessage("No se ha encontrado este producto.");
-        setProduct(null);
-        setIsLoading(false);
-        return;
-      }
-
-      setProduct(data as Product);
+    if (!productId) {
+      setErrorMessage("Producto no válido.");
       setIsLoading(false);
+      return;
     }
 
+    const { data, error } = await supabase
+      .from("products")
+      .select(
+        "id, name, description, price, image_url, game_system, faction, condition, status, is_visible",
+      )
+      .eq("id", productId)
+      .eq("is_visible", true)
+      .in("status", ["available", "reserved"])
+      .single();
+
+    if (error) {
+      setErrorMessage("No se ha encontrado este producto.");
+      setProduct(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setProduct(data as Product);
+    setIsLoading(false);
+  }
+
+  async function handleReserveProduct() {
+    if (!product) {
+      return;
+    }
+
+    setIsReserving(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    const { error } = await supabase.rpc("reserve_product", {
+      product_id_input: product.id,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setIsReserving(false);
+      return;
+    }
+
+    setProduct({
+      ...product,
+      status: "reserved",
+    });
+
+    setSuccessMessage("Producto reservado correctamente.");
+    setIsReserving(false);
+    router.refresh();
+  }
+
+  useEffect(() => {
     loadProduct();
   }, [productId]);
 
@@ -108,7 +141,7 @@ export default function ProductPage() {
             </section>
           ) : null}
 
-          {!isLoading && errorMessage ? (
+          {!isLoading && errorMessage && !product ? (
             <section className="rounded-2xl border border-red-500/40 bg-red-500/10 p-8 text-center text-red-200 shadow-2xl">
               <p className="text-sm font-semibold uppercase tracking-[0.3em]">
                 Producto no disponible
@@ -246,16 +279,43 @@ export default function ProductPage() {
                     WhatsApp, sin pago online.
                   </div>
 
+                  {errorMessage ? (
+                    <p className="mt-6 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                      {errorMessage}
+                    </p>
+                  ) : null}
+
+                  {successMessage ? (
+                    <p className="mt-6 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                      {successMessage}
+                    </p>
+                  ) : null}
+
                   <button
-                    disabled={isReserved}
+                    type="button"
+                    disabled={isReserved || isReserving}
+                    onClick={handleReserveProduct}
                     className={`mt-6 w-full rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wide transition ${
                       isReserved
                         ? "cursor-not-allowed bg-zinc-800 text-zinc-500"
-                        : "bg-amber-500 text-zinc-950 hover:bg-amber-400"
+                        : "bg-amber-500 text-zinc-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
                     }`}
                   >
-                    {isReserved ? "Producto reservado" : "Reservar producto"}
+                    {isReserving
+                      ? "Reservando..."
+                      : isReserved
+                        ? "Producto reservado"
+                        : "Reservar producto"}
                   </button>
+
+                  {isReserved ? (
+                    <Link
+                      href="/reservations"
+                      className="mt-4 block text-center text-sm font-bold text-amber-400 transition hover:text-amber-300"
+                    >
+                      Ver mis reservas
+                    </Link>
+                  ) : null}
                 </aside>
               </section>
             </>
