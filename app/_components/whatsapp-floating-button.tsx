@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase/client";
 
@@ -10,7 +11,15 @@ type WhatsAppFloatingButtonProps = {
 export function WhatsAppFloatingButton({
   whatsappLink,
 }: WhatsAppFloatingButtonProps) {
+  const pathname = usePathname();
   const [canShowButton, setCanShowButton] = useState(false);
+
+  const isPrivateRoute =
+    pathname.startsWith("/catalog") ||
+    pathname.startsWith("/reservations") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/product/") ||
+    pathname.startsWith("/admin");
 
   useEffect(() => {
     async function checkSession() {
@@ -18,11 +27,11 @@ export function WhatsAppFloatingButton({
         data: { user },
       } = await supabase.auth.getUser();
 
-      setCanShowButton(Boolean(user));
+      setCanShowButton(Boolean(user) && isPrivateRoute);
     }
 
     checkSession();
-  }, []);
+  }, [isPrivateRoute]);
 
   if (!canShowButton) {
     return null;
