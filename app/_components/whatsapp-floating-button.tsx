@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase/client";
 
 type WhatsAppFloatingButtonProps = {
