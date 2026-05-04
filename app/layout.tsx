@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { WhatsAppFloatingButton } from "./_components/whatsapp-floating-button";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,12 +24,29 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "+34 601 07 93 73";
+  const whatsappMessage =
+    process.env.NEXT_PUBLIC_WHATSAPP_MESSAGE ??
+    "Hola, quiero información sobre las miniaturas.";
+  const normalizedWhatsappNumber = whatsappNumber
+    ? whatsappNumber.replace(/\D/g, "")
+    : "";
+  const whatsappLink = normalizedWhatsappNumber
+    ? `https://wa.me/${normalizedWhatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
+    : null;
+
   return (
     <html
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+
+        {whatsappLink ? (
+          <WhatsAppFloatingButton whatsappLink={whatsappLink} />
+        ) : null}
+      </body>
     </html>
   );
 }
