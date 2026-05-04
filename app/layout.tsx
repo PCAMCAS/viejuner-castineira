@@ -24,7 +24,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "+34 601 07 93 73";
+  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
   const whatsappMessage =
     process.env.NEXT_PUBLIC_WHATSAPP_MESSAGE ??
     "Hola, quiero información sobre las miniaturas.";
@@ -43,7 +43,9 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col">
         {children}
 
-        {whatsappLink ? <WhatsAppFloatingButton whatsappLink={whatsappLink} /> : null}
+        {whatsappLink ? (
+          <WhatsAppFloatingButton whatsappLink={whatsappLink} />
+        ) : null}
       </body>
     </html>
   );
