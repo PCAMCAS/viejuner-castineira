@@ -167,6 +167,7 @@ export default function AdminReservationsPage() {
         `,
       )
       .eq("status", "active")
+      .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -177,7 +178,8 @@ export default function AdminReservationsPage() {
     }
 
     const normalizedReservations = ((data ?? []) as unknown as RawReservation[])
-      .map(normalizeReservation);
+      .map(normalizeReservation)
+      .filter((reservation) => reservation.reservation_items.length > 0);
 
     setReservations(normalizedReservations);
     setIsLoading(false);
