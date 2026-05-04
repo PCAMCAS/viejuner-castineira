@@ -24,7 +24,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
+  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "+34 601 07 93 73";
   const whatsappMessage =
     process.env.NEXT_PUBLIC_WHATSAPP_MESSAGE ??
     "Hola, quiero información sobre las miniaturas.";
