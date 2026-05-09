@@ -6,7 +6,12 @@ import { useEffect, useState } from "react";
 import { AuthGuard } from "../_components/auth-guard";
 import { LogoutButton } from "../_components/logout-button";
 import { PageHeader } from "../_components/page-header";
-import { factions, gameSystems } from "../_data/catalog";
+import {
+  factions,
+  getCatalogGameSystemName,
+  gameSystems,
+  toCatalogGameSystemSlug,
+} from "../_data/catalog";
 import { supabase } from "../../lib/supabase/client";
 
 type Product = {
@@ -22,12 +27,6 @@ type Product = {
   is_visible: boolean;
 };
 
-function getSystemName(systemSlug: string) {
-  return (
-    gameSystems.find((system) => system.slug === systemSlug)?.name ??
-    systemSlug
-  );
-}
 
 function getStatusLabel(status: Product["status"]) {
   if (status === "reserved") {
@@ -149,7 +148,7 @@ export default function CatalogContent() {
         return true;
       }
 
-      return product.game_system === selectedSystem;
+      return toCatalogGameSystemSlug(product.game_system) === selectedSystem;
     })
     .filter((product) => {
       if (selectedFaction === "all") {
@@ -284,7 +283,7 @@ export default function CatalogContent() {
               <span className="text-zinc-300">
                 {selectedSystem === "all"
                   ? "Todos los sistemas"
-                  : getSystemName(selectedSystem)}
+                  : getCatalogGameSystemName(selectedSystem)}
                 {" · "}
                 {selectedFaction === "all"
                   ? "Todas las facciones"
@@ -365,7 +364,7 @@ export default function CatalogContent() {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
-                            {getSystemName(product.game_system)}
+                            {getCatalogGameSystemName(product.game_system)}
                           </p>
 
                           <Link href={`/product/${product.id}`}>

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AuthGuard } from "../../_components/auth-guard";
-import { gameSystems } from "../../_data/catalog";
+import { getCatalogGameSystemName } from "../../_data/catalog";
 import { supabase } from "../../../lib/supabase/client";
 
 type Product = {
@@ -20,12 +20,21 @@ type Product = {
   is_visible: boolean;
 };
 
-function getSystemName(systemSlug: string) {
-  return (
-    gameSystems.find((system) => system.slug === systemSlug)?.name ??
-    systemSlug
-  );
-}
+type Profile = {
+  first_name: string;
+  last_name: string;
+  role: "user" | "admin";
+};
+
+type ProductComment = {
+  id: number;
+  product_id: number;
+  user_id: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+};
+
 
 function getStatusLabel(status: Product["status"]) {
   if (status === "reserved") {
@@ -43,24 +52,116 @@ function getStatusLabel(status: Product["status"]) {
   return "Disponible";
 }
 
+function formatCommentDate(date: string) {
+  return new Intl.DateTimeFormat("es-ES", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(date));
+}
+
+type SupabaseError = {
+  code?: string;
+  message?: string;
+};
+
+function isMissingCommentsTableError(error: SupabaseError) {
+  return (
+    error.code === "PGRST205" ||
+    Boolean(
+      error.message?.includes("schema cache") &&
+        error.message.includes("product_comments"),
+    )
+  );
+}
+
+const commentsSetupMessage =
+  "Los comentarios todavía no están disponibles. Aplica la migración de Supabase incluida en el repositorio y recarga la página.";
+
 export default function ProductPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const productId = Number(params.id);
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [comments, setComments] = useState<ProductComment[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [commentErrorMessage, setCommentErrorMessage] = useState("");
+  const [commentSuccessMessage, setCommentSuccessMessage] = useState("");
+  const [areCommentsUnavailable, setAreCommentsUnavailable] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isReserving, setIsReserving] = useState(false);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(
+    null,
+  );
 
-  async function loadProduct() {
+  const loadCurrentProfile = useCallback(async function loadCurrentProfile() {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setProfile(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("first_name, last_name, role")
+      .eq("id", user.id)
+      .single();
+
+    if (error) {
+      setProfile(null);
+      return;
+    }
+
+    setProfile(data as Profile);
+  }, []);
+
+  const loadComments = useCallback(async function loadComments() {
+    if (!productId) {
+      setComments([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("product_comments")
+      .select("id, product_id, user_id, author_name, body, created_at")
+      .eq("product_id", productId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      if (isMissingCommentsTableError(error)) {
+        setAreCommentsUnavailable(true);
+        setComments([]);
+        return;
+      }
+
+      setCommentErrorMessage(error.message);
+      setComments([]);
+      return;
+    }
+
+    setAreCommentsUnavailable(false);
+    setComments((data ?? []) as ProductComment[]);
+  }, [productId]);
+
+  const loadProduct = useCallback(async function loadProduct() {
     setIsLoading(true);
     setErrorMessage("");
     setSuccessMessage("");
+    setCommentErrorMessage("");
+    setCommentSuccessMessage("");
+    setAreCommentsUnavailable(false);
 
     if (!productId) {
       setErrorMessage("Producto no válido.");
+      setProduct(null);
+      setComments([]);
       setIsLoading(false);
       return;
     }
@@ -78,13 +179,15 @@ export default function ProductPage() {
     if (error) {
       setErrorMessage("No se ha encontrado este producto.");
       setProduct(null);
+      setComments([]);
       setIsLoading(false);
       return;
     }
 
     setProduct(data as Product);
+    await Promise.all([loadCurrentProfile(), loadComments()]);
     setIsLoading(false);
-  }
+  }, [loadComments, loadCurrentProfile, productId]);
 
   async function handleReserveProduct() {
     if (!product) {
@@ -115,11 +218,131 @@ export default function ProductPage() {
     router.refresh();
   }
 
+  async function handleAddComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (areCommentsUnavailable) {
+      setCommentErrorMessage("");
+      return;
+    }
+
+    if (!product || !profile) {
+      setCommentErrorMessage("No se ha podido identificar tu perfil.");
+      return;
+    }
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const body = String(formData.get("comment") ?? "").trim();
+
+    setCommentErrorMessage("");
+    setCommentSuccessMessage("");
+
+    if (!body) {
+      setCommentErrorMessage("Escribe un comentario antes de publicarlo.");
+      return;
+    }
+
+    if (body.length > 500) {
+      setCommentErrorMessage("El comentario no puede superar 500 caracteres.");
+      return;
+    }
+
+    setIsSubmittingComment(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setCommentErrorMessage("No se ha podido comprobar la sesión.");
+      setIsSubmittingComment(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("product_comments")
+      .insert({
+        product_id: product.id,
+        user_id: user.id,
+        author_name: `${profile.first_name} ${profile.last_name}`.trim(),
+        body,
+      })
+      .select("id, product_id, user_id, author_name, body, created_at")
+      .single();
+
+    if (error) {
+      if (isMissingCommentsTableError(error)) {
+        setAreCommentsUnavailable(true);
+        setCommentErrorMessage("");
+      } else {
+        setCommentErrorMessage(error.message);
+      }
+
+      setIsSubmittingComment(false);
+      return;
+    }
+
+    setAreCommentsUnavailable(false);
+    setComments((currentComments) => [
+      data as ProductComment,
+      ...currentComments,
+    ]);
+    form.reset();
+    setCommentSuccessMessage("Comentario publicado correctamente.");
+    setIsSubmittingComment(false);
+  }
+
+  async function handleDeleteComment(comment: ProductComment) {
+    if (profile?.role !== "admin") {
+      setCommentErrorMessage("Sólo el admin puede eliminar comentarios.");
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      "¿Seguro que quieres eliminar este comentario?",
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setDeletingCommentId(comment.id);
+    setCommentErrorMessage("");
+    setCommentSuccessMessage("");
+
+    const { error } = await supabase
+      .from("product_comments")
+      .delete()
+      .eq("id", comment.id);
+
+    if (error) {
+      if (isMissingCommentsTableError(error)) {
+        setAreCommentsUnavailable(true);
+        setCommentErrorMessage("");
+      } else {
+        setCommentErrorMessage(error.message);
+      }
+
+      setDeletingCommentId(null);
+      return;
+    }
+
+    setAreCommentsUnavailable(false);
+    setComments((currentComments) =>
+      currentComments.filter((currentComment) => currentComment.id !== comment.id),
+    );
+    setCommentSuccessMessage("Comentario eliminado correctamente.");
+    setDeletingCommentId(null);
+  }
+
   useEffect(() => {
     loadProduct();
-  }, [productId]);
+  }, [loadProduct]);
 
   const isReserved = product?.status === "reserved";
+  const isAdmin = profile?.role === "admin";
 
   return (
     <AuthGuard>
@@ -220,7 +443,7 @@ export default function ProductPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
-                        {getSystemName(product.game_system)}
+                        {getCatalogGameSystemName(product.game_system)}
                       </p>
 
                       <h2 className="mt-2 text-2xl font-black">
@@ -317,6 +540,120 @@ export default function ProductPage() {
                     </Link>
                   ) : null}
                 </aside>
+              </section>
+
+              <section className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl">
+                <div className="flex flex-col gap-2 border-b border-zinc-800 pb-5 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-500">
+                      Comentarios
+                    </p>
+                    <h2 className="mt-2 text-2xl font-black">
+                      Opiniones y dudas sobre este producto
+                    </h2>
+                  </div>
+
+                  <p className="text-sm text-zinc-400">
+                    {comments.length} {comments.length === 1 ? "comentario" : "comentarios"}
+                  </p>
+                </div>
+
+                <form onSubmit={handleAddComment} className="mt-6 space-y-4">
+                  <label className="block space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+                      Añadir comentario
+                    </span>
+                    <textarea
+                      name="comment"
+                      rows={4}
+                      maxLength={500}
+                      disabled={areCommentsUnavailable}
+                      placeholder="Escribe tu comentario, pregunta o aclaración..."
+                      className="w-full resize-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-zinc-500 focus:border-amber-500 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-500"
+                    />
+                  </label>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-zinc-500">
+                      Todos los comentarios publicados serán visibles para los
+                      usuarios y administradores.
+                    </p>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmittingComment || areCommentsUnavailable}
+                      className="rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
+                    >
+                      {isSubmittingComment ? "Publicando..." : "Publicar"}
+                    </button>
+                  </div>
+                </form>
+
+                {areCommentsUnavailable ? (
+                  <p className="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                    {commentsSetupMessage}
+                  </p>
+                ) : null}
+
+                {commentErrorMessage ? (
+                  <p className="mt-5 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                    {commentErrorMessage}
+                  </p>
+                ) : null}
+
+                {commentSuccessMessage ? (
+                  <p className="mt-5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                    {commentSuccessMessage}
+                  </p>
+                ) : null}
+
+                <div className="mt-6 space-y-4">
+                  {comments.length > 0 ? (
+                    comments.map((comment) => (
+                      <article
+                        key={comment.id}
+                        className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-5"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="font-bold text-zinc-100">
+                              {comment.author_name || "Usuario"}
+                            </p>
+                            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                              {formatCommentDate(comment.created_at)}
+                            </p>
+                          </div>
+
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              disabled={deletingCommentId === comment.id}
+                              onClick={() => handleDeleteComment(comment)}
+                              className="rounded-full border border-red-500/40 px-4 py-2 text-xs font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:border-zinc-700 disabled:text-zinc-500"
+                            >
+                              {deletingCommentId === comment.id
+                                ? "Eliminando..."
+                                : "Eliminar"}
+                            </button>
+                          ) : null}
+                        </div>
+
+                        <p className="mt-4 whitespace-pre-line text-sm leading-6 text-zinc-300">
+                          {comment.body}
+                        </p>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/40 p-6 text-center">
+                      <p className="font-bold text-zinc-100">
+                        Aún no hay comentarios.
+                      </p>
+                      <p className="mt-2 text-sm text-zinc-500">
+                        Sé la primera persona en comentar este producto.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </section>
             </>
           ) : null}

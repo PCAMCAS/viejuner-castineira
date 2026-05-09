@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AdminGuard } from "../../../../_components/admin-guard";
-import { factions, gameSystems } from "../../../../_data/catalog";
+import {
+  factions,
+  gameSystems,
+  toCatalogGameSystemSlug,
+  toDatabaseGameSystem,
+} from "../../../../_data/catalog";
 import { supabase } from "../../../../../lib/supabase/client";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
@@ -99,12 +104,13 @@ export default function EditProductPage() {
       const description = String(formData.get("description") ?? "").trim();
       const price = Number(formData.get("price"));
       const condition = String(formData.get("condition") ?? "").trim();
-      const gameSystem = String(formData.get("system") ?? "").trim();
+      const selectedGameSystem = String(formData.get("system") ?? "").trim();
+      const gameSystem = toDatabaseGameSystem(selectedGameSystem);
       const faction = String(formData.get("faction") ?? "").trim();
       const isVisible = formData.get("isVisible") === "on";
       const image = formData.get("image");
 
-      if (!name || !description || !condition || !gameSystem || !faction) {
+      if (!name || !description || !condition || !selectedGameSystem || !faction) {
         throw new Error("Rellena todos los campos obligatorios.");
       }
 
@@ -362,7 +368,7 @@ export default function EditProductPage() {
                       <select
                         id="system"
                         name="system"
-                        defaultValue={product.game_system}
+                        defaultValue={toCatalogGameSystemSlug(product.game_system)}
                         className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none transition focus:border-amber-500"
                       >
                         {gameSystems
