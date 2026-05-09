@@ -31,6 +31,38 @@ export const gameSystems = [
   },
 ];
 
+export const databaseGameSystemByCatalogSlug: Record<string, string> = {
+  "warhammer-40k": "40k",
+  "age-of-sigmar": "aos",
+  "warhammer-fantasy": "fantasy",
+  "the-old-world": "fantasy",
+  "otros-juegos": "otros",
+};
+
+export const catalogSlugByDatabaseGameSystem: Record<string, string> = {
+  "40k": "warhammer-40k",
+  aos: "age-of-sigmar",
+  fantasy: "warhammer-fantasy",
+  otros: "otros-juegos",
+};
+
+export function toDatabaseGameSystem(system: string) {
+  return databaseGameSystemByCatalogSlug[system] ?? system;
+}
+
+export function toCatalogGameSystemSlug(system: string) {
+  return catalogSlugByDatabaseGameSystem[system] ?? system;
+}
+
+export function getCatalogGameSystemName(system: string) {
+  const catalogSlug = toCatalogGameSystemSlug(system);
+
+  return (
+    gameSystems.find((gameSystem) => gameSystem.slug === catalogSlug)?.name ??
+    system
+  );
+}
+
 export const factions = [
   {
     id: "all",

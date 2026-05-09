@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AdminGuard } from "../../_components/admin-guard";
+import { getCatalogGameSystemName } from "../../_data/catalog";
 import { supabase } from "../../../lib/supabase/client";
 
 type Product = {
@@ -17,17 +18,6 @@ type Product = {
   status: "available" | "reserved" | "sold" | "hidden";
   is_visible: boolean;
 };
-
-function getSystemName(system: string) {
-  const systemNames: Record<string, string> = {
-    "40k": "Warhammer 40K",
-    aos: "Age of Sigmar",
-    fantasy: "Warhammer Fantasy",
-    otros: "Otros",
-  };
-
-  return systemNames[system] ?? system;
-}
 
 function getStatusLabel(status: Product["status"]) {
   const statusLabels: Record<Product["status"], string> = {
@@ -157,6 +147,37 @@ export default function AdminProductsPage() {
     setUpdatingProductId(null);
   }
 
+  async function deleteProduct(product: Product) {
+    const confirmDelete = window.confirm(
+      `¿Seguro que quieres eliminar "${product.name}"? Esta acción no se puede deshacer.`,
+    );
+
+    if (!confirmDelete) return;
+
+    setUpdatingProductId(product.id);
+    setErrorMessage("");
+
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", product.id);
+
+    if (error) {
+      setErrorMessage(
+        error.code === "23503"
+          ? "No se puede eliminar este producto porque tiene reservas asociadas. Cancela o cierra esas reservas antes de eliminarlo."
+          : error.message,
+      );
+      setUpdatingProductId(null);
+      return;
+    }
+
+    setProducts((currentProducts) =>
+      currentProducts.filter((currentProduct) => currentProduct.id !== product.id),
+    );
+    setUpdatingProductId(null);
+  }
+
   async function reactivateProduct(productId: number) {
     const confirmReactivate = window.confirm(
       "¿Seguro que quieres reactivar este producto? Volverá a aparecer como disponible en el catálogo.",
@@ -249,7 +270,7 @@ export default function AdminProductsPage() {
 
           {!isLoading && products.length > 0 ? (
             <section className="mt-8 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 shadow-2xl">
-              <div className="grid grid-cols-1 gap-4 border-b border-zinc-800 p-5 text-sm font-bold uppercase tracking-[0.2em] text-zinc-500 md:grid-cols-[1fr_150px_150px_120px_270px]">
+              <div className="grid grid-cols-1 gap-4 border-b border-zinc-800 p-5 text-sm font-bold uppercase tracking-[0.2em] text-zinc-500 md:grid-cols-[1fr_150px_150px_120px_340px]">
                 <span>Producto</span>
                 <span>Sistema</span>
                 <span>Facción</span>
@@ -268,7 +289,7 @@ export default function AdminProductsPage() {
                   return (
                     <article
                       key={product.id}
-                      className="grid grid-cols-1 gap-4 p-5 md:grid-cols-[1fr_150px_150px_120px_270px] md:items-center"
+                      className="grid grid-cols-1 gap-4 p-5 md:grid-cols-[1fr_150px_150px_120px_340px] md:items-center"
                     >
                       <div className="flex gap-4">
                         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
@@ -319,7 +340,7 @@ export default function AdminProductsPage() {
                       </div>
 
                       <p className="text-sm text-zinc-300">
-                        {getSystemName(product.game_system)}
+                        {getCatalogGameSystemName(product.game_system)}
                       </p>
 
                       <p className="text-sm text-zinc-300">{product.faction}</p>
@@ -372,6 +393,15 @@ export default function AdminProductsPage() {
                           className="rounded-xl border border-red-500/40 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
                         >
                           {isUpdating ? "..." : "Vendido"}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => deleteProduct(product)}
+                          className="rounded-xl bg-red-500/10 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-200 transition hover:bg-red-500/20 hover:text-red-100 disabled:cursor-not-allowed disabled:bg-zinc-900 disabled:text-zinc-600"
+                        >
+                          {isUpdating ? "..." : "Eliminar"}
                         </button>
                       </div>
                     </article>

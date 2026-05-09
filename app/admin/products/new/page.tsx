@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { AdminGuard } from "../../../_components/admin-guard";
-import { factions, gameSystems } from "../../../_data/catalog";
+import {
+  factions,
+  gameSystems,
+  toDatabaseGameSystem,
+} from "../../../_data/catalog";
 import { supabase } from "../../../../lib/supabase/client";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
@@ -27,12 +31,13 @@ export default function NewProductPage() {
     const description = String(formData.get("description") ?? "").trim();
     const price = Number(formData.get("price"));
     const condition = String(formData.get("condition") ?? "").trim();
-    const gameSystem = String(formData.get("system") ?? "").trim();
+    const selectedGameSystem = String(formData.get("system") ?? "").trim();
+    const gameSystem = toDatabaseGameSystem(selectedGameSystem);
     const faction = String(formData.get("faction") ?? "").trim();
     const isVisible = formData.get("isVisible") === "on";
     const image = formData.get("image");
 
-    if (!name || !description || !condition || !gameSystem || !faction) {
+    if (!name || !description || !condition || !selectedGameSystem || !faction) {
       setErrorMessage("Rellena todos los campos obligatorios.");
       setIsLoading(false);
       return;

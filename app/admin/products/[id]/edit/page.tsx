@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { AdminGuard } from "../../../../_components/admin-guard";
-import { factions, gameSystems } from "../../../../_data/catalog";
+import {
+  factions,
+  gameSystems,
+  toCatalogGameSystemSlug,
+  toDatabaseGameSystem,
+} from "../../../../_data/catalog";
 import { supabase } from "../../../../../lib/supabase/client";
 
 const PRODUCT_IMAGES_BUCKET = "product-images";
@@ -99,12 +104,13 @@ export default function EditProductPage() {
       const description = String(formData.get("description") ?? "").trim();
       const price = Number(formData.get("price"));
       const condition = String(formData.get("condition") ?? "").trim();
-      const gameSystem = String(formData.get("system") ?? "").trim();
+      const selectedGameSystem = String(formData.get("system") ?? "").trim();
+      const gameSystem = toDatabaseGameSystem(selectedGameSystem);
       const faction = String(formData.get("faction") ?? "").trim();
       const isVisible = formData.get("isVisible") === "on";
       const image = formData.get("image");
 
-      if (!name || !description || !condition || !gameSystem || !faction) {
+      if (!name || !description || !condition || !selectedGameSystem || !faction) {
         throw new Error("Rellena todos los campos obligatorios.");
       }
 
@@ -155,6 +161,41 @@ export default function EditProductPage() {
 
       setIsSaving(false);
     }
+  }
+
+  async function deleteProduct() {
+    if (!product) {
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `¿Seguro que quieres eliminar "${product.name}"? Esta acción no se puede deshacer.`,
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage("");
+
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", product.id);
+
+    if (error) {
+      setErrorMessage(
+        error.code === "23503"
+          ? "No se puede eliminar este producto porque tiene reservas asociadas. Cancela o cierra esas reservas antes de eliminarlo."
+          : error.message,
+      );
+      setIsSaving(false);
+      return;
+    }
+
+    router.push("/admin/products");
+    router.refresh();
   }
 
   async function markProductAsSold() {
@@ -362,7 +403,7 @@ export default function EditProductPage() {
                       <select
                         id="system"
                         name="system"
-                        defaultValue={product.game_system}
+                        defaultValue={toCatalogGameSystemSlug(product.game_system)}
                         className="mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none transition focus:border-amber-500"
                       >
                         {gameSystems
@@ -480,6 +521,15 @@ export default function EditProductPage() {
                     className="w-full rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
                   >
                     Marcar como vendido
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={deleteProduct}
+                    className="w-full rounded-xl bg-red-500/10 px-4 py-3 text-sm font-bold uppercase tracking-wide text-red-200 transition hover:bg-red-500/20 hover:text-red-100 disabled:cursor-not-allowed disabled:bg-zinc-900 disabled:text-zinc-600"
+                  >
+                    Eliminar producto
                   </button>
 
                   <Link
