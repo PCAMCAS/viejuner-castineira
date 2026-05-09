@@ -163,6 +163,41 @@ export default function EditProductPage() {
     }
   }
 
+  async function deleteProduct() {
+    if (!product) {
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `¿Seguro que quieres eliminar "${product.name}"? Esta acción no se puede deshacer.`,
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage("");
+
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", product.id);
+
+    if (error) {
+      setErrorMessage(
+        error.code === "23503"
+          ? "No se puede eliminar este producto porque tiene reservas asociadas. Cancela o cierra esas reservas antes de eliminarlo."
+          : error.message,
+      );
+      setIsSaving(false);
+      return;
+    }
+
+    router.push("/admin/products");
+    router.refresh();
+  }
+
   async function markProductAsSold() {
     if (!product) {
       return;
@@ -486,6 +521,15 @@ export default function EditProductPage() {
                     className="w-full rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold uppercase tracking-wide text-red-300 transition hover:border-red-400 hover:text-red-200 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
                   >
                     Marcar como vendido
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={deleteProduct}
+                    className="w-full rounded-xl bg-red-500/10 px-4 py-3 text-sm font-bold uppercase tracking-wide text-red-200 transition hover:bg-red-500/20 hover:text-red-100 disabled:cursor-not-allowed disabled:bg-zinc-900 disabled:text-zinc-600"
+                  >
+                    Eliminar producto
                   </button>
 
                   <Link

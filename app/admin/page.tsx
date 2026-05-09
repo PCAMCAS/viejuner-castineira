@@ -31,6 +31,19 @@ type Reservation = {
   reservation_items: ReservationItem[];
 };
 
+type ProductSummary = {
+  name: string;
+};
+
+type ProductCommentNotification = {
+  id: number;
+  product_id: number;
+  author_name: string;
+  body: string;
+  created_at: string;
+  products: ProductSummary | null;
+};
+
 type RawReservation = {
   id: number;
   status:
@@ -42,6 +55,15 @@ type RawReservation = {
   expires_at: string;
   profiles: Profile | Profile[] | null;
   reservation_items: ReservationItem[];
+};
+
+type RawProductCommentNotification = {
+  id: number;
+  product_id: number;
+  author_name: string;
+  body: string;
+  created_at: string;
+  products: ProductSummary | ProductSummary[] | null;
 };
 
 type AdminStats = {
@@ -68,6 +90,34 @@ function normalizeReservation(rawReservation: RawReservation): Reservation {
   };
 }
 
+function normalizeProductComment(
+  rawComment: RawProductCommentNotification,
+): ProductCommentNotification {
+  return {
+    id: rawComment.id,
+    product_id: rawComment.product_id,
+    author_name: rawComment.author_name,
+    body: rawComment.body,
+    created_at: rawComment.created_at,
+    products: getSingleValue(rawComment.products),
+  };
+}
+
+type SupabaseError = {
+  code?: string;
+  message?: string;
+};
+
+function isMissingCommentsTableError(error: SupabaseError) {
+  return (
+    error.code === "PGRST205" ||
+    Boolean(
+      error.message?.includes("schema cache") &&
+        error.message.includes("product_comments"),
+    )
+  );
+}
+
 function getReservationTotal(items: ReservationItem[]) {
   return items.reduce((total, item) => {
     return total + Number(item.price_at_reservation);
@@ -91,6 +141,13 @@ function getDaysLeft(date: string) {
   return `${daysLeft} días`;
 }
 
+function formatCommentDate(date: string) {
+  return new Intl.DateTimeFormat("es-ES", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(date));
+}
+
 function getCustomerName(profile: Profile | null) {
   if (!profile) {
     return "Cliente sin perfil";
@@ -108,6 +165,9 @@ export default function AdminPage() {
   const [recentReservations, setRecentReservations] = useState<Reservation[]>(
     [],
   );
+  const [recentComments, setRecentComments] = useState<
+    ProductCommentNotification[]
+  >([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -178,6 +238,33 @@ export default function AdminPage() {
       return;
     }
 
+    const { data: commentsData, error: commentsError } = await supabase
+      .from("product_comments")
+      .select(
+        `
+          id,
+          product_id,
+          author_name,
+          body,
+          created_at,
+          products (
+            name
+          )
+        `,
+      )
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (commentsError && !isMissingCommentsTableError(commentsError)) {
+      setErrorMessage(commentsError.message);
+      setIsLoading(false);
+      return;
+    }
+
+    const normalizedComments = (
+      (commentsData ?? []) as unknown as RawProductCommentNotification[]
+    ).map(normalizeProductComment);
+
     const normalizedReservations = (
       (reservationsData ?? []) as unknown as RawReservation[]
     ).map(normalizeReservation);
@@ -193,6 +280,7 @@ export default function AdminPage() {
     });
 
     setRecentReservations(normalizedReservations.slice(0, 3));
+    setRecentComments(normalizedComments);
     setIsLoading(false);
   }
 
@@ -341,27 +429,91 @@ export default function AdminPage() {
                   </Link>
                 </aside>
 
-                <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl">
-                  <div className="flex flex-col gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-bold uppercase tracking-[0.2em] text-zinc-500">
-                        Actividad reciente
-                      </p>
+                <div className="space-y-6">
+                  <section className="rounded-2xl border border-amber-500/30 bg-zinc-900/70 p-6 shadow-2xl">
+                    <div className="flex flex-col gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-[0.2em] text-amber-500">
+                          Notificaciones
+                        </p>
 
-                      <h2 className="mt-2 text-2xl font-black">
-                        Reservas activas
-                      </h2>
+                        <h2 className="mt-2 text-2xl font-black">
+                          Comentarios recientes
+                        </h2>
+                      </div>
+
+                      <span className="w-fit rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-300">
+                        {recentComments.length} nuevos
+                      </span>
                     </div>
 
-                    <Link
-                      href="/admin/reservations"
-                      className="text-sm font-bold text-amber-400 transition hover:text-amber-300"
-                    >
-                      Ver todas
-                    </Link>
-                  </div>
+                    {recentComments.length === 0 ? (
+                      <section className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950/50 p-6 text-center">
+                        <p className="font-bold text-zinc-100">
+                          No hay comentarios recientes.
+                        </p>
 
-                  {recentReservations.length === 0 ? (
+                        <p className="mt-2 text-sm text-zinc-400">
+                          Cuando alguien comente un producto aparecerá aquí.
+                        </p>
+                      </section>
+                    ) : null}
+
+                    {recentComments.length > 0 ? (
+                      <div className="mt-5 space-y-4">
+                        {recentComments.map((comment) => (
+                          <Link
+                            key={comment.id}
+                            href={`/product/${comment.product_id}`}
+                            className="block rounded-xl border border-zinc-800 bg-zinc-950/50 p-5 transition hover:border-amber-500/60"
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <p className="text-lg font-black text-zinc-100">
+                                  {comment.products?.name ??
+                                    `Producto #${comment.product_id}`}
+                                </p>
+                                <p className="mt-1 text-sm text-zinc-400">
+                                  {comment.author_name || "Usuario"} ·{" "}
+                                  {formatCommentDate(comment.created_at)}
+                                </p>
+                              </div>
+
+                              <span className="w-fit rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-amber-300">
+                                Ver producto
+                              </span>
+                            </div>
+
+                            <p className="mt-4 line-clamp-2 text-sm leading-6 text-zinc-300">
+                              {comment.body}
+                            </p>
+                          </Link>
+                        ))}
+                      </div>
+                        ) : null}
+                  </section>
+
+                  <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-2xl">
+                    <div className="flex flex-col gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-[0.2em] text-zinc-500">
+                          Actividad reciente
+                        </p>
+
+                        <h2 className="mt-2 text-2xl font-black">
+                          Reservas activas
+                        </h2>
+                      </div>
+
+                      <Link
+                        href="/admin/reservations"
+                        className="text-sm font-bold text-amber-400 transition hover:text-amber-300"
+                      >
+                        Ver todas
+                      </Link>
+                    </div>
+
+                    {recentReservations.length === 0 ? (
                     <section className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950/50 p-6 text-center">
                       <p className="font-bold text-zinc-100">
                         No hay reservas activas.
@@ -373,7 +525,7 @@ export default function AdminPage() {
                     </section>
                   ) : null}
 
-                  {recentReservations.length > 0 ? (
+                    {recentReservations.length > 0 ? (
                     <div className="mt-5 space-y-4">
                       {recentReservations.map((reservation) => {
                         const total = getReservationTotal(
@@ -439,7 +591,8 @@ export default function AdminPage() {
                       })}
                     </div>
                   ) : null}
-                </section>
+                  </section>
+                </div>
               </section>
             </>
           ) : null}

@@ -388,7 +388,9 @@ Puede:
 - crear productos,
 - editar productos,
 - ocultar productos,
+- eliminar productos,
 - marcar productos como vendidos,
+- ver notificaciones de comentarios recientes,
 - gestionar reservas de usuarios.
 
 El acceso a las rutas privadas de administración está protegido con el componente:
