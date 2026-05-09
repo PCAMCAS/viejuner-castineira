@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AuthGuard } from "../../_components/auth-guard";
-import { gameSystems } from "../../_data/catalog";
+import { getCatalogGameSystemName } from "../../_data/catalog";
 import { supabase } from "../../../lib/supabase/client";
 
 type Product = {
@@ -35,12 +35,6 @@ type ProductComment = {
   created_at: string;
 };
 
-function getSystemName(systemSlug: string) {
-  return (
-    gameSystems.find((system) => system.slug === systemSlug)?.name ??
-    systemSlug
-  );
-}
 
 function getStatusLabel(status: Product["status"]) {
   if (status === "reserved") {
@@ -449,7 +443,7 @@ export default function ProductPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-500">
-                        {getSystemName(product.game_system)}
+                        {getCatalogGameSystemName(product.game_system)}
                       </p>
 
                       <h2 className="mt-2 text-2xl font-black">
