@@ -303,6 +303,29 @@ Guarda los productos incluidos en cada reserva.
 
 ---
 
+### `product_comments`
+
+Guarda los comentarios visibles en la ficha de cada producto.
+
+**Campos principales:**
+
+- `id`
+- `product_id`
+- `user_id`
+- `author_name`
+- `body`
+- `created_at`
+
+**Permisos recomendados:**
+
+- cualquier visitante puede leer comentarios,
+- cualquier usuario autenticado puede crear comentarios para productos visibles,
+- sólo los perfiles con rol `admin` pueden eliminar comentarios.
+
+La migración `supabase/migrations/20260509120000_create_product_comments.sql` crea la tabla, el índice y las políticas RLS necesarias. También puedes ejecutar el script equivalente `supabase/product_comments.sql` desde el SQL editor de Supabase.
+
+---
+
 ## Funciones SQL utilizadas
 
 La aplicación utiliza funciones PostgreSQL en Supabase para mantener la lógica crítica de reservas en el backend.
