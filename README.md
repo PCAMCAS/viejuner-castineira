@@ -322,7 +322,7 @@ Guarda los comentarios visibles en la ficha de cada producto.
 - cualquier usuario autenticado puede crear comentarios para productos visibles,
 - sólo los perfiles con rol `admin` pueden eliminar comentarios.
 
-El script `supabase/product_comments.sql` crea la tabla, el índice y las políticas RLS necesarias.
+La migración `supabase/migrations/20260509120000_create_product_comments.sql` crea la tabla, el índice y las políticas RLS necesarias. También puedes ejecutar el script equivalente `supabase/product_comments.sql` desde el SQL editor de Supabase.
 
 ---
 

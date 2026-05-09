@@ -65,6 +65,24 @@ function formatCommentDate(date: string) {
   }).format(new Date(date));
 }
 
+type SupabaseError = {
+  code?: string;
+  message?: string;
+};
+
+function isMissingCommentsTableError(error: SupabaseError) {
+  return (
+    error.code === "PGRST205" ||
+    Boolean(
+      error.message?.includes("schema cache") &&
+        error.message.includes("product_comments"),
+    )
+  );
+}
+
+const commentsSetupMessage =
+  "Los comentarios todavía no están disponibles. Aplica la migración de Supabase incluida en el repositorio y recarga la página.";
+
 export default function ProductPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -77,6 +95,7 @@ export default function ProductPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [commentErrorMessage, setCommentErrorMessage] = useState("");
   const [commentSuccessMessage, setCommentSuccessMessage] = useState("");
+  const [areCommentsUnavailable, setAreCommentsUnavailable] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isReserving, setIsReserving] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -122,11 +141,18 @@ export default function ProductPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
+      if (isMissingCommentsTableError(error)) {
+        setAreCommentsUnavailable(true);
+        setComments([]);
+        return;
+      }
+
       setCommentErrorMessage(error.message);
       setComments([]);
       return;
     }
 
+    setAreCommentsUnavailable(false);
     setComments((data ?? []) as ProductComment[]);
   }, [productId]);
 
@@ -136,6 +162,7 @@ export default function ProductPage() {
     setSuccessMessage("");
     setCommentErrorMessage("");
     setCommentSuccessMessage("");
+    setAreCommentsUnavailable(false);
 
     if (!productId) {
       setErrorMessage("Producto no válido.");
@@ -200,6 +227,11 @@ export default function ProductPage() {
   async function handleAddComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (areCommentsUnavailable) {
+      setCommentErrorMessage("");
+      return;
+    }
+
     if (!product || !profile) {
       setCommentErrorMessage("No se ha podido identificar tu perfil.");
       return;
@@ -247,11 +279,18 @@ export default function ProductPage() {
       .single();
 
     if (error) {
-      setCommentErrorMessage(error.message);
+      if (isMissingCommentsTableError(error)) {
+        setAreCommentsUnavailable(true);
+        setCommentErrorMessage("");
+      } else {
+        setCommentErrorMessage(error.message);
+      }
+
       setIsSubmittingComment(false);
       return;
     }
 
+    setAreCommentsUnavailable(false);
     setComments((currentComments) => [
       data as ProductComment,
       ...currentComments,
@@ -285,11 +324,18 @@ export default function ProductPage() {
       .eq("id", comment.id);
 
     if (error) {
-      setCommentErrorMessage(error.message);
+      if (isMissingCommentsTableError(error)) {
+        setAreCommentsUnavailable(true);
+        setCommentErrorMessage("");
+      } else {
+        setCommentErrorMessage(error.message);
+      }
+
       setDeletingCommentId(null);
       return;
     }
 
+    setAreCommentsUnavailable(false);
     setComments((currentComments) =>
       currentComments.filter((currentComment) => currentComment.id !== comment.id),
     );
@@ -527,8 +573,9 @@ export default function ProductPage() {
                       name="comment"
                       rows={4}
                       maxLength={500}
+                      disabled={areCommentsUnavailable}
                       placeholder="Escribe tu comentario, pregunta o aclaración..."
-                      className="w-full resize-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-zinc-500 focus:border-amber-500"
+                      className="w-full resize-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-zinc-500 focus:border-amber-500 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-500"
                     />
                   </label>
 
@@ -540,13 +587,19 @@ export default function ProductPage() {
 
                     <button
                       type="submit"
-                      disabled={isSubmittingComment}
+                      disabled={isSubmittingComment || areCommentsUnavailable}
                       className="rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold uppercase tracking-wide text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
                     >
                       {isSubmittingComment ? "Publicando..." : "Publicar"}
                     </button>
                   </div>
                 </form>
+
+                {areCommentsUnavailable ? (
+                  <p className="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                    {commentsSetupMessage}
+                  </p>
+                ) : null}
 
                 {commentErrorMessage ? (
                   <p className="mt-5 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
